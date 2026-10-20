@@ -16,6 +16,7 @@ extension SSHSession {
         }
 
         let request = SSHChannelRequestEvent.PseudoTerminalRequest(
+            wantReply: true,
             term: "xterm-256color",
             terminalCharacterWidth: 80,
             terminalRowHeight: 24,
@@ -31,7 +32,12 @@ extension SSHSession {
                 try await client.withPTY(request) { inbound, outbound in
                     await stdinBox.setWriter(outbound)
                     for try await chunk in inbound {
-                        onOutput(chunk)
+                        switch chunk {
+                        case .stdout(let buffer):
+                            onOutput(buffer)
+                        case .stderr(let buffer):
+                            onOutput(buffer)
+                        }
                     }
                 }
             } catch {
