@@ -3,9 +3,10 @@ import UIKit
 /// 服务器列表主页。
 ///
 /// 遵循 HIG 规范：
-/// - 内容层（UITableView）使用标准材质（systemGroupedBackground），**绝不使用玻璃**。
-/// - 功能层（右下角浮动添加按钮）使用 **GlassSurface (regular + interactive)** 挂载，
-///   在 iOS 26+ 呈现官方 UIGlassEffect，在 iOS 18~25 降级为超薄材质 + 仿高光描边。
+/// - 内容层（UITableView）使用标准材质（systemGroupedBackground），绝不使用玻璃。
+/// - 功能层（右下角浮动添加按钮）使用 GlassSurface (regular + interactive) 挂载。
+/// - 模态交互遵循 HIG Modality 标准：添加操作弹出标准半屏 Sheet 表单 (AddServerViewController)，
+///   彻底淘汰简陋的 UIAlertController。
 final class ServerListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -53,7 +54,7 @@ final class ServerListViewController: UIViewController {
         ])
     }
 
-    /// 功能层：浮动添加按钮。符合 HIG『仅关键功能元素使用玻璃』与『玻璃可做主要行动点着色』。
+    /// 功能层：浮动添加按钮。
     private func setupFloatingAddButton() {
         floatingAddButton.translatesAutoresizingMaskIntoConstraints = false
         floatingAddButton.setInteractive(true)
@@ -81,36 +82,30 @@ final class ServerListViewController: UIViewController {
         ])
     }
 
-    // MARK: - Actions
+    // MARK: - Actions (遵循 HIG Sheets 规范)
 
     @objc private func didTapAdd() {
-        let alert = UIAlertController(title: "添加服务器", message: "输入连接信息（支持密码认证）", preferredStyle: .alert)
-        alert.addTextField { $0.placeholder = "显示名称 (如 DMIT)" }
-        alert.addTextField { $0.placeholder = "主机 IP / 域名" }
-        alert.addTextField { $0.placeholder = "端口 (默认 22)" ; $0.text = "22" ; $0.keyboardType = .numberPad }
-        alert.addTextField { $0.placeholder = "用户名 (默认 root)" ; $0.text = "root" }
-        alert.addTextField { $0.placeholder = "密码" ; $0.isSecureTextEntry = true }
+        let addVC = AddServerViewController()
+        addVC.delegate = self
+        let nav = UINavigationController(rootViewController: addVC)
+        
+        // 采用 iOS 15+ 现代 Page Sheet 质感
+        if let sheet = nav.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+        
+        present(nav, animated: true)
+    }
+}
 
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "保存", style: .default, handler: { [weak self] _ in
-            guard let name = alert.textFields?[0].text, !name.isEmpty,
-                  let host = alert.textFields?[1].text, !host.isEmpty else { return }
-            let portStr = alert.textFields?[2].text ?? "22"
-            let port = Int(portStr) ?? 22
-            let user = alert.textFields?[3].text ?? "root"
-            let pwd = alert.textFields?[4].text ?? ""
+// MARK: - AddServerViewControllerDelegate
 
-            let s = Server(
-                name: name,
-                host: host,
-                port: port,
-                username: user.isEmpty ? "root" : user,
-                authType: .password(pwd)
-            )
-            ServerStore.shared.add(s)
-            self?.reload()
-        }))
-        present(alert, animated: true)
+extension ServerListViewController: AddServerViewControllerDelegate {
+    func addServerViewController(_ controller: AddServerViewController, didAdd server: Server) {
+        ServerStore.shared.add(server)
+        reload()
     }
 }
 

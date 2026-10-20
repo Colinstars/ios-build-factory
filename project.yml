@@ -9,8 +9,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     SWIFT_STRICT_CONCURRENCY: minimal
 
@@ -26,7 +26,7 @@ targets:
     sources:
       - path: Sources
     resources:
-      - path: Resources/Assets.xcassets
+      - path: Resources
     dependencies:
       - package: Citadel
     settings:

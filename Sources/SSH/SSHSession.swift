@@ -4,8 +4,8 @@ import NIOCore
 
 actor SSHSession {
 
-    private let server: Server
-    private var client: SSHClient?
+    let server: Server
+    var client: SSHClient?
 
     init(server: Server) {
         self.server = server
