@@ -68,7 +68,7 @@ final class ServerDetailViewController: UIViewController {
         stackView.addArrangedSubview(diskCard)
         stackView.addArrangedSubview(infoCard)
 
-        actionsCard.setValue("已激活为全局默认服务器\n可直接在底部【终端/文件/容器/更多】无缝操控。")
+        actionsCard.setValue("已设为当前活跃主机\n可在底部【智能体/文件/容器/更多】无缝协同。")
         stackView.addArrangedSubview(actionsCard)
 
         NSLayoutConstraint.activate([
