@@ -2,11 +2,10 @@ import UIKit
 
 /// 服务器列表主页。
 ///
-/// 遵循 HIG 规范：
-/// - 内容层（UITableView）使用标准材质（systemGroupedBackground），绝不使用玻璃。
-/// - 功能层（右下角浮动添加按钮）使用 GlassSurface (regular + interactive) 挂载。
-/// - 模态交互遵循 HIG Modality 标准：添加操作弹出标准半屏 Sheet 表单 (AddServerViewController)，
-///   彻底淘汰简陋的 UIAlertController。
+/// 遵循 Apple HIG Navigation Bars 与 Lists 规范：
+/// 1. 彻底恢复 iOS 标准大标题生命周期：
+///    未滚动时，大标题【主机】自然在左上角舒展，背景与系统底色 100% 融合一体，没有一丝一毫的断崖切线！
+/// 2. 只有向上滚动卡片时，大标题才自然平滑收缩为小标题，并呼出通透的磨砂遮罩！
 final class ServerListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -18,11 +17,9 @@ final class ServerListViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.navigationItem.title = "主机"
+        // 关键：标准大标题模式，绝不强行加硬约束
+        self.navigationItem.largeTitleDisplayMode = .always
         navigationController?.navigationBar.prefersLargeTitles = true
-        
-        // 关键物理穿透契约：允许内容向导航栏与底部安全区全面延展，唤醒极致液态通透折射
-        self.extendedLayoutIncludesOpaqueBars = true
-        self.edgesForExtendedLayout = .all
 
         view.backgroundColor = .systemGroupedBackground
 
@@ -53,11 +50,9 @@ final class ServerListViewController: UIViewController {
         // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
         tableView.applyLiquidGlassSoftEdgeEffect()
         
-        // 调整顶部间距，保证未滚动时第一张卡片与大标题有舒适的呼吸距离，绝不被压扁在灵动岛下方
-        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: 0, height: 8))
-
         view.addSubview(tableView)
 
+        // 关键布局修复：遵照 iOS 标准滚动视图布局规范，安全地贴紧 view 的四个边缘
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: view.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -100,12 +95,8 @@ final class ServerListViewController: UIViewController {
         let addVC = AddServerViewController()
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
-        // 关键修复：外层导航控制器必须硬性绑定为标准抽屉浅灰底色！
-        // 杜绝外壳透明透出底层白色导致 medium 半展开时输入框与底色融为一体！
         nav.view.backgroundColor = SheetColorScheme.background
         
-        // 完美实现先提一半的抽屉特性：支持 [.medium(), .large()]
-        // 配合 SheetColorScheme，放大和缩小仅仅是高度的区别，配色与分层 100% 绝对一致！
         if let sheet = nav.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
@@ -143,10 +134,8 @@ extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let s = servers[indexPath.row]
-        // 关键更新：将当前点击的节点同步设为全局活跃主机
         ActiveServerContext.shared.setActiveServer(s)
         
-        // 优化返回按键文字，避免挤占导航栏导致转场计算延时
         navigationItem.backButtonTitle = ""
         let detail = ServerDetailViewController(server: s)
         navigationController?.pushViewController(detail, animated: true)
