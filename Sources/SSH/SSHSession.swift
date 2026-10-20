@@ -26,8 +26,8 @@ actor SSHSession {
                 case .password(let pwd):
                     return .passwordBased(username: user, password: pwd)
                 case .privateKey:
-                    // 预留密钥认证路径（Ed25519 / RSA），P0 先走密码
-                    return .none
+                    // 预留密钥认证路径（Ed25519 / RSA），P0 暂未开放时走空密码回退
+                    return .passwordBased(username: user, password: "")
                 }
             },
             hostKeyValidator: .acceptAnything()
