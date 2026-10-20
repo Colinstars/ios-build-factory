@@ -10,13 +10,13 @@ final class MainTabBarController: UITabBarController {
     }
 
     private func setupViewControllers() {
-        // 1. 状态 (ServerListViewController 主控状态监控)
-        let statusNav = UINavigationController(rootViewController: ServerListViewController())
-        statusNav.tabBarItem = UITabBarItem(title: "状态", image: UIImage(systemName: "gauge.with.needle"), selectedImage: UIImage(systemName: "gauge.with.needle.fill"))
+        // 1. 主机 (ServerListViewController，原状态已重塑为【主机】)
+        let hostsNav = UINavigationController(rootViewController: ServerListViewController())
+        hostsNav.tabBarItem = UITabBarItem(title: "主机", image: UIImage(systemName: "server.rack"), selectedImage: UIImage(systemName: "server.rack"))
 
-        // 2. 终端 (GlobalTerminalViewController)
-        let terminalNav = UINavigationController(rootViewController: GlobalTerminalViewController())
-        terminalNav.tabBarItem = UITabBarItem(title: "终端", image: UIImage(systemName: "terminal"), selectedImage: UIImage(systemName: "terminal.fill"))
+        // 2. 智能体 (AgentViewController，全面淘汰终端，换用全新 AI 运维智能体)
+        let agentNav = UINavigationController(rootViewController: AgentViewController())
+        agentNav.tabBarItem = UITabBarItem(title: "智能体", image: UIImage(systemName: "sparkles"), selectedImage: UIImage(systemName: "sparkles"))
 
         // 3. 文件 (GlobalFilesViewController)
         let filesNav = UINavigationController(rootViewController: GlobalFilesViewController())
@@ -30,17 +30,10 @@ final class MainTabBarController: UITabBarController {
         let opsNav = UINavigationController(rootViewController: GlobalOpsViewController())
         opsNav.tabBarItem = UITabBarItem(title: "更多", image: UIImage(systemName: "ellipsis.circle"), selectedImage: UIImage(systemName: "ellipsis.circle.fill"))
 
-        viewControllers = [statusNav, terminalNav, filesNav, dockerNav, opsNav]
+        viewControllers = [hostsNav, agentNav, filesNav, dockerNav, opsNav]
     }
 
     private func setupAppearance() {
-        // 遵循 iOS 26+ 规范，构建在 iOS 26 SDK 下时，系统 TabBar 自动启用官方 Liquid Glass 材质
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        tabBar.standardAppearance = appearance
-        if #available(iOS 15.0, *) {
-            tabBar.scrollEdgeAppearance = appearance
-        }
         tabBar.tintColor = .systemBlue
     }
 }
