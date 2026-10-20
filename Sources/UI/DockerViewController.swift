@@ -43,6 +43,10 @@ final class DockerViewController: UIViewController {
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(DockerContainerCell.self, forCellReuseIdentifier: "DockerCell")
+        
+        // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
+        tableView.applyLiquidGlassSoftEdgeEffect()
+
         view.addSubview(tableView)
 
         refreshControl.addTarget(self, action: #selector(didPullRefresh), for: .valueChanged)

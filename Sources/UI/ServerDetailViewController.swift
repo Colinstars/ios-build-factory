@@ -70,6 +70,9 @@ final class ServerDetailViewController: UIViewController {
 
         actionsCard.setValue("已设为当前活跃主机\n可在底部【智能体/文件/容器/更多】无缝协同。")
         stackView.addArrangedSubview(actionsCard)
+        
+        // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
+        scrollView.applyLiquidGlassSoftEdgeEffect()
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
