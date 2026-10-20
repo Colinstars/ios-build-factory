@@ -1,0 +1,56 @@
+name: build-ipa
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 显示 Xcode / Swift 版本
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          swift --version
+
+      - name: 编译并打包 IPA
+        run: bash build.sh
+
+      - name: 上传未签名 IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhoneFacts-unsigned-ipa
+          path: PhoneFacts-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 若存在签名资产则额外签名
+        if: ${{ env.SIGN_P12_B64 != '' }}
+        env:
+          SIGN_P12_B64: ${{ secrets.SIGN_P12_B64 }}
+        run: |
+          set -e
+          echo "$SIGN_P12_B64" | base64 -d > /tmp/cert.p12
+          echo "${{ secrets.SIGN_PROV_B64 }}" | base64 -d > /tmp/dev.mobileprovision
+          echo "${{ secrets.SIGN_P12_PASS }}" > /tmp/pass.txt
+          brew install opa334/tap/zsign || brew install zsign || true
+          zsign -k /tmp/cert.p12 -p "$(cat /tmp/pass.txt)" -m /tmp/dev.mobileprovision \
+                -o PhoneFacts-signed.ipa PhoneFacts-unsigned.ipa
+          ls -lh PhoneFacts-signed.ipa
+
+      - name: 上传已签名 IPA
+        if: ${{ env.SIGN_P12_B64 != '' }}
+        env:
+          SIGN_P12_B64: ${{ secrets.SIGN_P12_B64 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhoneFacts-signed-ipa
+          path: PhoneFacts-signed.ipa
+          if-no-files-found: ignore
+          retention-days: 30
