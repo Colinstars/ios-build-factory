@@ -24,9 +24,6 @@ final class FilesViewController: UIViewController {
         super.viewDidLoad()
         self.navigationItem.title = "文件"
         navigationController?.navigationBar.prefersLargeTitles = true
-        
-        self.extendedLayoutIncludesOpaqueBars = true
-        self.edgesForExtendedLayout = .all
 
         view.backgroundColor = .systemGroupedBackground
 

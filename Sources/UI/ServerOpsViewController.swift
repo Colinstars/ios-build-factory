@@ -33,10 +33,6 @@ final class ServerOpsViewController: UIViewController {
         super.viewDidLoad()
         self.navigationItem.title = "更多"
         navigationController?.navigationBar.prefersLargeTitles = true
-        
-        // 关键物理穿透契约：允许列表向上滑动时毫无阻碍地穿透至导航栏下方，呈现极致微透折射！
-        self.extendedLayoutIncludesOpaqueBars = true
-        self.edgesForExtendedLayout = .all
 
         view.backgroundColor = .systemGroupedBackground
 

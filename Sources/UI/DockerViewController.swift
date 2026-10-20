@@ -29,9 +29,6 @@ final class DockerViewController: UIViewController {
         super.viewDidLoad()
         self.navigationItem.title = "容器"
         navigationController?.navigationBar.prefersLargeTitles = true
-        
-        self.extendedLayoutIncludesOpaqueBars = true
-        self.edgesForExtendedLayout = .all
 
         view.backgroundColor = .systemGroupedBackground
         setupTableView()
