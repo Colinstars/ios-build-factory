@@ -23,6 +23,11 @@ final class FilesViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         self.navigationItem.title = "文件"
+        navigationController?.navigationBar.prefersLargeTitles = true
+        
+        self.extendedLayoutIncludesOpaqueBars = true
+        self.edgesForExtendedLayout = .all
+
         view.backgroundColor = .systemGroupedBackground
 
         setupTableView()

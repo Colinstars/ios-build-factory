@@ -36,6 +36,10 @@ final class AgentViewController: UIViewController {
         super.viewDidLoad()
         self.navigationItem.title = "智能体"
         navigationController?.navigationBar.prefersLargeTitles = true
+        
+        self.extendedLayoutIncludesOpaqueBars = true
+        self.edgesForExtendedLayout = .all
+
         view.backgroundColor = .systemGroupedBackground
 
         setupTableView()

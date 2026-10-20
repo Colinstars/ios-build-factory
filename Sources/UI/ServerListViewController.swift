@@ -19,6 +19,11 @@ final class ServerListViewController: UIViewController {
         super.viewDidLoad()
         self.navigationItem.title = "主机"
         navigationController?.navigationBar.prefersLargeTitles = true
+        
+        // 关键物理穿透契约：允许内容向导航栏与底部安全区全面延展，唤醒极致液态通透折射
+        self.extendedLayoutIncludesOpaqueBars = true
+        self.edgesForExtendedLayout = .all
+
         view.backgroundColor = .systemGroupedBackground
 
         setupTableView()
