@@ -1,46 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="PhoneFacts"
-BUNDLE_ID="com.colinstars.phonefacts"
-MIN_IOS="15.0"
-OUT_DIR="build"
+APP_NAME="ServerLens"
+OUT="build"
 
-echo "==> SDK"
-SDK_PATH="$(xcrun --sdk iphoneos --show-sdk-path)"
-echo "SDK: $SDK_PATH"
+echo "==> 工具链"
+xcodebuild -version
 xcrun --sdk iphoneos --show-sdk-version
 
-echo "==> 清理"
-rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/$APP_NAME.app"
+echo "==> 安装 XcodeGen"
+if ! command -v xcodegen >/dev/null 2>&1; then
+  brew install xcodegen
+fi
+xcodegen --version
 
-echo "==> 编译 (arm64-apple-ios$MIN_IOS)"
-xcrun -sdk iphoneos swiftc \
-  -target "arm64-apple-ios$MIN_IOS" \
-  -sdk "$SDK_PATH" \
-  -parse-as-library \
-  -O \
-  -module-name "$APP_NAME" \
-  -o "$OUT_DIR/$APP_NAME.app/$APP_NAME" \
-  Sources/main.swift \
-  -framework SwiftUI \
-  -framework UIKit \
-  -framework Foundation
+echo "==> 生成工程"
+xcodegen generate
 
-echo "==> 拷贝 Info.plist"
-cp Resources/Info.plist "$OUT_DIR/$APP_NAME.app/Info.plist"
+echo "==> 解析 SPM 依赖（Citadel）"
+xcodebuild -resolvePackageDependencies \
+  -project "${APP_NAME}.xcodeproj" \
+  -scheme "${APP_NAME}"
 
-echo "==> 运行时依赖检查"
-otool -L "$OUT_DIR/$APP_NAME.app/$APP_NAME" | head -20
-echo "--- 架构 ---"
-lipo -info "$OUT_DIR/$APP_NAME.app/$APP_NAME" || file "$OUT_DIR/$APP_NAME.app/$APP_NAME"
+echo "==> 编译"
+rm -rf "$OUT"
+xcodebuild \
+  -project "${APP_NAME}.xcodeproj" \
+  -scheme "${APP_NAME}" \
+  -configuration Release \
+  -sdk iphoneos \
+  -derivedDataPath "$OUT" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" \
+  build
+
+APP_PATH="$OUT/Build/Products/Release-iphoneos/${APP_NAME}.app"
+echo "==> 产物"
+ls -la "$APP_PATH"
+
+echo "==> 校验部署版本与 SDK"
+otool -l "$APP_PATH/${APP_NAME}" | grep -A5 LC_BUILD_VERSION || true
+lipo -info "$APP_PATH/${APP_NAME}" || true
 
 echo "==> 打包 Payload"
-mkdir -p "$OUT_DIR/Payload"
-cp -R "$OUT_DIR/$APP_NAME.app" "$OUT_DIR/Payload/"
-( cd "$OUT_DIR" && zip -qry "../${APP_NAME}-unsigned.ipa" Payload )
+mkdir -p "$OUT/Payload"
+cp -R "$APP_PATH" "$OUT/Payload/"
+( cd "$OUT" && zip -qry "../${APP_NAME}-unsigned.ipa" Payload )
 
-echo "==> 产物"
 ls -lh "${APP_NAME}-unsigned.ipa"
 shasum -a 256 "${APP_NAME}-unsigned.ipa"

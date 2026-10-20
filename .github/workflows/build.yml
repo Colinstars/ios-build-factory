@@ -8,16 +8,16 @@ on:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 显示 Xcode / Swift 版本
+      - name: 锁定 Xcode 26.3 工具链（以获取 iOS 26 SDK 与液态玻璃符号）
         run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
-          swift --version
 
       - name: 编译并打包 IPA
         run: bash build.sh
@@ -25,8 +25,8 @@ jobs:
       - name: 上传未签名 IPA
         uses: actions/upload-artifact@v4
         with:
-          name: PhoneFacts-unsigned-ipa
-          path: PhoneFacts-unsigned.ipa
+          name: ServerLens-unsigned-ipa
+          path: ServerLens-unsigned.ipa
           if-no-files-found: error
           retention-days: 30
 
@@ -41,8 +41,8 @@ jobs:
           echo "${{ secrets.SIGN_P12_PASS }}" > /tmp/pass.txt
           brew install opa334/tap/zsign || brew install zsign || true
           zsign -k /tmp/cert.p12 -p "$(cat /tmp/pass.txt)" -m /tmp/dev.mobileprovision \
-                -o PhoneFacts-signed.ipa PhoneFacts-unsigned.ipa
-          ls -lh PhoneFacts-signed.ipa
+                -o ServerLens-signed.ipa ServerLens-unsigned.ipa
+          ls -lh ServerLens-signed.ipa
 
       - name: 上传已签名 IPA
         if: ${{ env.SIGN_P12_B64 != '' }}
@@ -50,7 +50,7 @@ jobs:
           SIGN_P12_B64: ${{ secrets.SIGN_P12_B64 }}
         uses: actions/upload-artifact@v4
         with:
-          name: PhoneFacts-signed-ipa
-          path: PhoneFacts-signed.ipa
+          name: ServerLens-signed-ipa
+          path: ServerLens-signed.ipa
           if-no-files-found: ignore
           retention-days: 30
