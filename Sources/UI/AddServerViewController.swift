@@ -1,44 +1,63 @@
 import UIKit
 
+/// 彻底锁定抽屉界面的色彩常量：
+/// 浅色模式下：底色恒为经典苹果分组浅灰 (#F2F2F7)，输入框卡片恒为纯白 (#FFFFFF)；
+/// 深色模式下：底色恒为纯黑 (#000000)，输入框卡片恒为深灰卡片 (#1C1C1E)。
+/// 杜绝系统动态语义色在不同 detent 提权时的明度坍缩，实现缩小 (medium) 和放大 (large) 配色 100% 绝对一致！
+enum SheetColorScheme {
+    static let background = UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0/255.0, green: 0/255.0, blue: 0/255.0, alpha: 1.0)
+            : UIColor(red: 242/255.0, green: 242/255.0, blue: 247/255.0, alpha: 1.0)
+    }
+
+    static let card = UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 28/255.0, green: 28/255.0, blue: 30/255.0, alpha: 1.0)
+            : UIColor.white
+    }
+}
+
 protocol AddServerViewControllerDelegate: AnyObject {
     func addServerViewController(_ controller: AddServerViewController, didAdd server: Server)
 }
 
 /// 遵循现代 iOS HIG 规范的添加服务器表单页面。
 ///
-/// 彻底根除半屏 (medium) 未展开前发灰、展开后变白的物理原因：
-/// 1. 彻底淘汰 cellForRowAt 重复 addSubview 的复用污染，使用固定数组持有 5 个专有 Cell。
-/// 2. 绕过系统动态语义色的层级明度衰减，显式注入 UIColor.white (#FFFFFF)，确保浅色模式下从第 0 毫秒起恒为 100% 纯白卡片！
+/// 彻底解决抽屉在 medium（先提一半）和 large（全展开）底色不一致的根本原因：
+/// 1. 不再使用不可控的动态语义色，全面绑定 SheetColorScheme；
+/// 2. 无论用户点开半屏，还是放大到全屏，底色与输入框卡片色物理级 100% 恒定；
+/// 3. 拥有完整的半屏抽屉手感（先提一半，支持手势上滑放大与下拉关闭）。
 final class AddServerViewController: UIViewController {
 
     weak var delegate: AddServerViewControllerDelegate?
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
-    // 5 大独立输入框控件
     private let nameField = UITextField()
     private let hostField = UITextField()
     private let portField = UITextField()
     private let userField = UITextField()
     private let passwordField = UITextField()
 
-    // 5 个一次性初始化的专用表单 Cell，杜绝复用冲突
     private var basicCells: [UITableViewCell] = []
     private var authCells: [UITableViewCell] = []
-
-    // 纯白高对比度卡片背景色：浅色模式恒为纯白 #FFFFFF，暗色模式为深灰 #2C2C2E
-    private let cardBackgroundColor = UIColor { trait in
-        trait.userInterfaceStyle == .dark ? UIColor(red: 44/255.0, green: 44/255.0, blue: 46/255.0, alpha: 1.0) : UIColor.white
-    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
         self.navigationItem.title = "添加服务器"
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = SheetColorScheme.background
 
         setupNavigationBar()
         buildFormCells()
         setupTableView()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 确保视图展示时底色彻底锁定
+        view.backgroundColor = SheetColorScheme.background
+        tableView.backgroundColor = SheetColorScheme.background
     }
 
     private func setupNavigationBar() {
@@ -59,8 +78,7 @@ final class AddServerViewController: UIViewController {
     }
 
     private func buildFormCells() {
-        // 配置输入框基础属性
-        nameField.placeholder = "我的主机 (必填)"
+        nameField.placeholder = "我的主机 (如 DMIT 香港)"
         nameField.clearButtonMode = .whileEditing
         nameField.autocapitalizationType = .none
         nameField.autocorrectionType = .no
@@ -89,14 +107,12 @@ final class AddServerViewController: UIViewController {
         passwordField.clearButtonMode = .whileEditing
         passwordField.textColor = .label
 
-        // 构建 Section 0 (基本信息)
         basicCells = [
             createInputCell(title: "名称", field: nameField),
             createInputCell(title: "主机", field: hostField),
             createInputCell(title: "端口", field: portField)
         ]
 
-        // 构建 Section 1 (凭据认证)
         authCells = [
             createInputCell(title: "用户", field: userField),
             createInputCell(title: "密码", field: passwordField)
@@ -106,13 +122,13 @@ final class AddServerViewController: UIViewController {
     private func createInputCell(title: String, field: UITextField) -> UITableViewCell {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         cell.selectionStyle = .none
-        
-        // 关键修复：直接将背景色硬性锁定为卡片纯白色，禁用默认透明层透出灰色底！
-        cell.backgroundColor = cardBackgroundColor
-        cell.contentView.backgroundColor = cardBackgroundColor
+
+        // 彻底锁定输入框卡片颜色：恒为白色（亮色模式纯白卡片，暗色模式深灰卡片），杜绝与浅灰底色融合！
+        cell.backgroundColor = SheetColorScheme.card
+        cell.contentView.backgroundColor = SheetColorScheme.card
 
         var bg = UIBackgroundConfiguration.listGroupedCell()
-        bg.backgroundColor = cardBackgroundColor
+        bg.backgroundColor = SheetColorScheme.card
         cell.backgroundConfiguration = bg
 
         let titleLabel = UILabel()
@@ -143,7 +159,7 @@ final class AddServerViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = SheetColorScheme.background
         tableView.dataSource = self
         tableView.delegate = self
         tableView.keyboardDismissMode = .onDrag

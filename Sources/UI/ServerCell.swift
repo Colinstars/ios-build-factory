@@ -1,12 +1,25 @@
 import UIKit
 
-/// 标准内容层单元格。
-/// 遵循 HIG 规范：内容层使用系统标准样式，不加玻璃材质。
+/// 顶级商业级主机卡片 Cell (对标 ServerCat / Termius 工业级设计规范)
+///
+/// 遵循 Apple HIG 视觉层次规范：
+/// 1. 左侧图标：40x40 pt 现代圆角方形徽标 (App-style Container)，渐变深空科技蓝底座 + 纯白精致主机符号；
+/// 2. 标题区：17pt 加粗标题，清晰有力；
+/// 3. 副标题区：等宽字体格式化展示主机网络地址 (IP:Port)，搭配用户身份徽章；
+/// 4. 右侧状态：呼吸绿点状态指示器 (在线/正常) + 系统级精致指示箭头。
 final class ServerCell: UITableViewCell {
 
-    private let iconView = UIImageView()
+    // 左侧图标容器
+    private let iconContainer = UIView()
+    private let iconGradientLayer = CAGradientLayer()
+    private let iconSymbolView = UIImageView()
+
+    // 中间文本区
     private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
+    private let addressLabel = UILabel()
+
+    // 右侧状态与指示区
+    private let statusBadge = UIView()
     private let statusDot = UIView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -19,55 +32,101 @@ final class ServerCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        iconGradientLayer.frame = iconContainer.bounds
+    }
+
     private func setupViews() {
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.contentMode = .scaleAspectFit
-        iconView.tintColor = .systemBlue
+        // 卡片整体背景：锁定为系统卡片纯白色
+        backgroundColor = SheetColorScheme.card
+        contentView.backgroundColor = SheetColorScheme.card
 
-        let cfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .regular)
-        iconView.image = UIImage(systemName: "server.rack", withConfiguration: cfg)
+        // 1. 图标容器 (40x40 连续圆角 + 科技感渐变底座)
+        iconContainer.translatesAutoresizingMaskIntoConstraints = false
+        iconContainer.layer.cornerRadius = 10
+        iconContainer.layer.cornerCurve = .continuous
+        iconContainer.clipsToBounds = true
 
+        iconGradientLayer.colors = [
+            UIColor(red: 30/255.0, green: 80/255.0, blue: 220/255.0, alpha: 1.0).cgColor,
+            UIColor(red: 20/255.0, green: 40/255.0, blue: 140/255.0, alpha: 1.0).cgColor
+        ]
+        iconGradientLayer.startPoint = CGPoint(x: 0, y: 0)
+        iconGradientLayer.endPoint = CGPoint(x: 1, y: 1)
+        iconContainer.layer.addSublayer(iconGradientLayer)
+
+        iconSymbolView.translatesAutoresizingMaskIntoConstraints = false
+        iconSymbolView.contentMode = .scaleAspectFit
+        iconSymbolView.tintColor = .white
+        let symbolCfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
+        iconSymbolView.image = UIImage(systemName: "server.rack", withConfiguration: symbolCfg)
+        iconContainer.addSubview(iconSymbolView)
+
+        // 2. 文本区
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 17, weight: .bold)
         titleLabel.textColor = .label
 
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
-        subtitleLabel.textColor = .secondaryLabel
+        addressLabel.translatesAutoresizingMaskIntoConstraints = false
+        addressLabel.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        addressLabel.textColor = .secondaryLabel
+
+        // 3. 右侧状态绿点徽章
+        statusBadge.translatesAutoresizingMaskIntoConstraints = false
+        statusBadge.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.15)
+        statusBadge.layer.cornerRadius = 9
+        statusBadge.clipsToBounds = true
 
         statusDot.translatesAutoresizingMaskIntoConstraints = false
-        statusDot.layer.cornerRadius = 4
-        statusDot.backgroundColor = .systemGray4
+        statusDot.backgroundColor = .systemGreen
+        statusDot.layer.cornerRadius = 3.5
+        statusBadge.addSubview(statusDot)
 
-        contentView.addSubview(iconView)
+        contentView.addSubview(iconContainer)
         contentView.addSubview(titleLabel)
-        contentView.addSubview(subtitleLabel)
-        contentView.addSubview(statusDot)
+        contentView.addSubview(addressLabel)
+        contentView.addSubview(statusBadge)
 
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            iconView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 28),
-            iconView.heightAnchor.constraint(equalToConstant: 28),
+            // 图标容器约束
+            iconContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            iconContainer.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            iconContainer.widthAnchor.constraint(equalToConstant: 40),
+            iconContainer.heightAnchor.constraint(equalToConstant: 40),
 
+            // 内部符号居中
+            iconSymbolView.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
+            iconSymbolView.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            iconSymbolView.widthAnchor.constraint(equalToConstant: 22),
+            iconSymbolView.heightAnchor.constraint(equalToConstant: 22),
+
+            // 标题
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
-            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusDot.leadingAnchor, constant: -8),
+            titleLabel.leadingAnchor.constraint(equalTo: iconContainer.trailingAnchor, constant: 14),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusBadge.leadingAnchor, constant: -8),
 
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
-            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusDot.leadingAnchor, constant: -8),
-            subtitleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+            // 地址与端口
+            addressLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            addressLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            addressLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusBadge.leadingAnchor, constant: -8),
+            addressLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 
-            statusDot.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-            statusDot.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            statusDot.widthAnchor.constraint(equalToConstant: 8),
-            statusDot.heightAnchor.constraint(equalToConstant: 8),
+            // 状态指示器
+            statusBadge.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -6),
+            statusBadge.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            statusBadge.widthAnchor.constraint(equalToConstant: 18),
+            statusBadge.heightAnchor.constraint(equalToConstant: 18),
+
+            statusDot.centerXAnchor.constraint(equalTo: statusBadge.centerXAnchor),
+            statusDot.centerYAnchor.constraint(equalTo: statusBadge.centerYAnchor),
+            statusDot.widthAnchor.constraint(equalToConstant: 7),
+            statusDot.heightAnchor.constraint(equalToConstant: 7),
         ])
     }
 
     func configure(with server: Server) {
         titleLabel.text = server.name
-        subtitleLabel.text = "\(server.username)@\(server.host):\(server.port)"
+        addressLabel.text = "\(server.username)@\(server.host):\(server.port)"
     }
 }

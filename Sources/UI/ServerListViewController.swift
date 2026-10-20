@@ -88,15 +88,16 @@ final class ServerListViewController: UIViewController {
         let addVC = AddServerViewController()
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
+        // 关键修复：外层导航控制器必须硬性绑定为标准抽屉浅灰底色！
+        // 杜绝外壳透明透出底层白色导致 medium 半展开时输入框与底色融为一体！
+        nav.view.backgroundColor = SheetColorScheme.background
         
-        // 关键体验与视觉修复：支持先提一半 [.medium(), .large()]，
-        // 并且必须指定 largestUndimmedDetentIdentifier = .medium，
-        // 告诉 iOS 系统：在半屏未展开时，严禁添加暗色调光遮罩！消除那层让输入框变灰的雾气！
+        // 完美实现先提一半的抽屉特性：支持 [.medium(), .large()]
+        // 配合 SheetColorScheme，放大和缩小仅仅是高度的区别，配色与分层 100% 绝对一致！
         if let sheet = nav.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 24
-            sheet.largestUndimmedDetentIdentifier = .medium
         }
         
         present(nav, animated: true)
