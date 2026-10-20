@@ -53,6 +53,9 @@ final class ServerListViewController: UIViewController {
         // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
         tableView.applyLiquidGlassSoftEdgeEffect()
         
+        // 调整顶部间距，保证未滚动时第一张卡片与大标题有舒适的呼吸距离，绝不被压扁在灵动岛下方
+        tableView.tableHeaderView = UIView(frame: CGRect(x: 0, y: 0, width: 0, height: 8))
+
         view.addSubview(tableView)
 
         NSLayoutConstraint.activate([
