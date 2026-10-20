@@ -6,27 +6,38 @@ protocol AddServerViewControllerDelegate: AnyObject {
 
 /// 遵循现代 iOS HIG 规范的添加服务器表单页面。
 ///
-/// 彻底修复 Sheet 展开/未展开时输入框与单元格背景色反差 bug：
-/// 显式将 TableView 统一使用 .systemGroupedBackground，单元格统一强制指定 .secondarySystemGroupedBackground。
-/// 彻底锁定 .large() 全展开高度，拒绝半展开半调光的视觉遮罩层影响。
+/// 彻底根除半屏 (medium) 未展开前发灰、展开后变白的物理原因：
+/// 1. 彻底淘汰 cellForRowAt 重复 addSubview 的复用污染，使用固定数组持有 5 个专有 Cell。
+/// 2. 绕过系统动态语义色的层级明度衰减，显式注入 UIColor.white (#FFFFFF)，确保浅色模式下从第 0 毫秒起恒为 100% 纯白卡片！
 final class AddServerViewController: UIViewController {
 
     weak var delegate: AddServerViewControllerDelegate?
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
+    // 5 大独立输入框控件
     private let nameField = UITextField()
     private let hostField = UITextField()
     private let portField = UITextField()
     private let userField = UITextField()
     private let passwordField = UITextField()
 
+    // 5 个一次性初始化的专用表单 Cell，杜绝复用冲突
+    private var basicCells: [UITableViewCell] = []
+    private var authCells: [UITableViewCell] = []
+
+    // 纯白高对比度卡片背景色：浅色模式恒为纯白 #FFFFFF，暗色模式为深灰 #2C2C2E
+    private let cardBackgroundColor = UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 44/255.0, green: 44/255.0, blue: 46/255.0, alpha: 1.0) : UIColor.white
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "添加服务器"
+        self.navigationItem.title = "添加服务器"
         view.backgroundColor = .systemGroupedBackground
 
         setupNavigationBar()
+        buildFormCells()
         setupTableView()
     }
 
@@ -47,25 +58,8 @@ final class AddServerViewController: UIViewController {
         navigationItem.rightBarButtonItem = saveItem
     }
 
-    private func setupTableView() {
-        tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
-        tableView.dataSource = self
-        tableView.delegate = self
-        tableView.keyboardDismissMode = .onDrag
-        view.addSubview(tableView)
-
-        NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.topAnchor),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-        ])
-
-        configureTextFields()
-    }
-
-    private func configureTextFields() {
+    private func buildFormCells() {
+        // 配置输入框基础属性
         nameField.placeholder = "我的主机 (必填)"
         nameField.clearButtonMode = .whileEditing
         nameField.autocapitalizationType = .none
@@ -94,6 +88,73 @@ final class AddServerViewController: UIViewController {
         passwordField.isSecureTextEntry = true
         passwordField.clearButtonMode = .whileEditing
         passwordField.textColor = .label
+
+        // 构建 Section 0 (基本信息)
+        basicCells = [
+            createInputCell(title: "名称", field: nameField),
+            createInputCell(title: "主机", field: hostField),
+            createInputCell(title: "端口", field: portField)
+        ]
+
+        // 构建 Section 1 (凭据认证)
+        authCells = [
+            createInputCell(title: "用户", field: userField),
+            createInputCell(title: "密码", field: passwordField)
+        ]
+    }
+
+    private func createInputCell(title: String, field: UITextField) -> UITableViewCell {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.selectionStyle = .none
+        
+        // 关键修复：直接将背景色硬性锁定为卡片纯白色，禁用默认透明层透出灰色底！
+        cell.backgroundColor = cardBackgroundColor
+        cell.contentView.backgroundColor = cardBackgroundColor
+
+        var bg = UIBackgroundConfiguration.listGroupedCell()
+        bg.backgroundColor = cardBackgroundColor
+        cell.backgroundConfiguration = bg
+
+        let titleLabel = UILabel()
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: 16, weight: .regular)
+        titleLabel.textColor = .label
+        cell.contentView.addSubview(titleLabel)
+
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.font = .systemFont(ofSize: 16)
+        cell.contentView.addSubview(field)
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 16),
+            titleLabel.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor),
+            titleLabel.widthAnchor.constraint(equalToConstant: 72),
+
+            field.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 12),
+            field.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -16),
+            field.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 10),
+            field.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -10),
+            field.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
+        ])
+
+        return cell
+    }
+
+    private func setupTableView() {
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.backgroundColor = .systemGroupedBackground
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.keyboardDismissMode = .onDrag
+        view.addSubview(tableView)
+
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
     }
 
     @objc private func didTapCancel() {
@@ -145,7 +206,7 @@ extension AddServerViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return section == 0 ? 3 : 2
+        return section == 0 ? basicCells.count : authCells.count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
@@ -160,62 +221,6 @@ extension AddServerViewController: UITableViewDataSource, UITableViewDelegate {
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
-        cell.selectionStyle = .none
-        
-        // 关键视觉修复：解决先提一半 (medium) 时系统遮罩让卡片变灰的顽疾！
-        // 显式指定 UIBackgroundConfiguration，强制填充系统纯白/纯净卡片色，并赋予 1px 细微边界！
-        // 无论抽屉是 medium 半展开还是 large 全展开，输入框从第 0 毫秒起始终保持与展开后完全一致的纯白通透卡片质感！
-        var bg = UIBackgroundConfiguration.listGroupedCell()
-        bg.backgroundColor = .secondarySystemGroupedBackground
-        cell.backgroundConfiguration = bg
-        cell.contentView.backgroundColor = .clear
-
-        let labelWidth: CGFloat = 80
-        let titleLabel = UILabel()
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 16, weight: .regular)
-        titleLabel.textColor = .label
-        cell.contentView.addSubview(titleLabel)
-
-        let textField: UITextField
-        if indexPath.section == 0 {
-            if indexPath.row == 0 {
-                titleLabel.text = "名称"
-                textField = nameField
-            } else if indexPath.row == 1 {
-                titleLabel.text = "主机"
-                textField = hostField
-            } else {
-                titleLabel.text = "端口"
-                textField = portField
-            }
-        } else {
-            if indexPath.row == 0 {
-                titleLabel.text = "用户"
-                textField = userField
-            } else {
-                titleLabel.text = "密码"
-                textField = passwordField
-            }
-        }
-
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        textField.font = .systemFont(ofSize: 16)
-        cell.contentView.addSubview(textField)
-
-        NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 16),
-            titleLabel.centerYAnchor.constraint(equalTo: cell.contentView.centerYAnchor),
-            titleLabel.widthAnchor.constraint(equalToConstant: labelWidth),
-
-            textField.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 12),
-            textField.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -16),
-            textField.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 10),
-            textField.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor, constant: -10),
-            textField.heightAnchor.constraint(greaterThanOrEqualToConstant: 24),
-        ])
-
-        return cell
+        return indexPath.section == 0 ? basicCells[indexPath.row] : authCells[indexPath.row]
     }
 }

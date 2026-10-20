@@ -1,6 +1,6 @@
 import UIKit
 
-// MARK: - 1. 底部【终端】全局页面 (响应全局上下文)
+// MARK: - 1. 底部【终端】全局页面
 
 final class GlobalTerminalViewController: UIViewController {
 
@@ -10,8 +10,9 @@ final class GlobalTerminalViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "终端"
+        // 彻底杜绝拼接字符串：导航栏主标题必须恒定为板块名称【终端】！
         self.navigationItem.title = "终端"
+        navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
         setupTipLabel()
 
@@ -34,7 +35,7 @@ final class GlobalTerminalViewController: UIViewController {
 
     private func setupTipLabel() {
         tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "暂无连接目标\n请在【状态】列表点击任意服务器切换上下文"
+        tipLabel.text = "暂无连接目标\n请在【状态】列表添加或选择一台服务器"
         tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -57,18 +58,14 @@ final class GlobalTerminalViewController: UIViewController {
             terminalVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            self.navigationItem.title = "终端"
             return
         }
 
         if currentServerId == server.id && terminalVC != nil {
-            return // 已就绪，保持会话不重连
+            return
         }
 
         tipLabel.isHidden = true
-        // 关键修复：绝不能设置 self.title，只能设置 self.navigationItem.title！
-        // 否则底部 TabBar 的『终端』字样会被强行改写成『终端 (DMIT 示例)』！
-        self.navigationItem.title = "终端 (\(server.name))"
         currentServerId = server.id
 
         terminalVC?.view.removeFromSuperview()
@@ -95,7 +92,9 @@ final class GlobalFilesViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "文件"
+        // 导航栏主标题必须恒定为板块名称【文件】！
+        self.navigationItem.title = "文件"
+        navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemBackground
         setupTipLabel()
 
@@ -138,7 +137,6 @@ final class GlobalFilesViewController: UIViewController {
             filesVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            self.navigationItem.title = "文件"
             return
         }
 
@@ -147,7 +145,6 @@ final class GlobalFilesViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        self.navigationItem.title = "文件 (\(server.name))"
         currentServerId = server.id
 
         filesVC?.view.removeFromSuperview()
@@ -174,7 +171,9 @@ final class GlobalDockerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "容器"
+        // 导航栏主标题必须恒定为板块名称【容器】！
+        self.navigationItem.title = "容器"
+        navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground
         setupTipLabel()
 
@@ -217,7 +216,6 @@ final class GlobalDockerViewController: UIViewController {
             dockerVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            self.navigationItem.title = "容器"
             return
         }
 
@@ -226,7 +224,6 @@ final class GlobalDockerViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        self.navigationItem.title = "容器 (\(server.name))"
         currentServerId = server.id
 
         dockerVC?.view.removeFromSuperview()
@@ -253,7 +250,9 @@ final class GlobalOpsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "运维工具"
+        // 导航栏主标题必须恒定为板块名称【更多】！
+        self.navigationItem.title = "更多"
+        navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground
         setupTipLabel()
 
@@ -296,7 +295,6 @@ final class GlobalOpsViewController: UIViewController {
             opsVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            self.navigationItem.title = "运维工具"
             return
         }
 
@@ -305,7 +303,6 @@ final class GlobalOpsViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        self.navigationItem.title = "运维 (\(server.name))"
         currentServerId = server.id
 
         opsVC?.view.removeFromSuperview()

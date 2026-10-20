@@ -89,12 +89,14 @@ final class ServerListViewController: UIViewController {
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
         
-        // 遵照要求恢复先提一半的最佳手感：支持 [.medium(), .large()]，并开启平滑变焦手势！
+        // 关键体验与视觉修复：支持先提一半 [.medium(), .large()]，
+        // 并且必须指定 largestUndimmedDetentIdentifier = .medium，
+        // 告诉 iOS 系统：在半屏未展开时，严禁添加暗色调光遮罩！消除那层让输入框变灰的雾气！
         if let sheet = nav.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 24
-            sheet.largestUndimmedDetentIdentifier = nil // 保持标准遮罩
+            sheet.largestUndimmedDetentIdentifier = .medium
         }
         
         present(nav, animated: true)
