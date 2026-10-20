@@ -17,7 +17,7 @@ final class ServerListViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "ServerLens"
+        self.navigationItem.title = "状态"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground
 
@@ -89,12 +89,12 @@ final class ServerListViewController: UIViewController {
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
         
-        // 关键体验修复：只使用 [.large()] 全展开模式！
-        // 彻底杜绝 medium 半展开时系统调光 (Dimming) 导致的输入框变灰反差 bug！
+        // 遵照要求恢复先提一半的最佳手感：支持 [.medium(), .large()]，并开启平滑变焦手势！
         if let sheet = nav.sheetPresentationController {
-            sheet.detents = [.large()]
+            sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 24
+            sheet.largestUndimmedDetentIdentifier = nil // 保持标准遮罩
         }
         
         present(nav, animated: true)

@@ -11,6 +11,7 @@ final class GlobalTerminalViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "终端"
+        self.navigationItem.title = "终端"
         view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
         setupTipLabel()
 
@@ -56,7 +57,7 @@ final class GlobalTerminalViewController: UIViewController {
             terminalVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            title = "终端"
+            self.navigationItem.title = "终端"
             return
         }
 
@@ -65,7 +66,9 @@ final class GlobalTerminalViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        title = "终端 (\(server.name))"
+        // 关键修复：绝不能设置 self.title，只能设置 self.navigationItem.title！
+        // 否则底部 TabBar 的『终端』字样会被强行改写成『终端 (DMIT 示例)』！
+        self.navigationItem.title = "终端 (\(server.name))"
         currentServerId = server.id
 
         terminalVC?.view.removeFromSuperview()
@@ -135,7 +138,7 @@ final class GlobalFilesViewController: UIViewController {
             filesVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            title = "文件"
+            self.navigationItem.title = "文件"
             return
         }
 
@@ -144,7 +147,7 @@ final class GlobalFilesViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        title = "文件 (\(server.name))"
+        self.navigationItem.title = "文件 (\(server.name))"
         currentServerId = server.id
 
         filesVC?.view.removeFromSuperview()
@@ -214,7 +217,7 @@ final class GlobalDockerViewController: UIViewController {
             dockerVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            title = "容器"
+            self.navigationItem.title = "容器"
             return
         }
 
@@ -223,7 +226,7 @@ final class GlobalDockerViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        title = "容器 (\(server.name))"
+        self.navigationItem.title = "容器 (\(server.name))"
         currentServerId = server.id
 
         dockerVC?.view.removeFromSuperview()
@@ -293,7 +296,7 @@ final class GlobalOpsViewController: UIViewController {
             opsVC = nil
             currentServerId = nil
             tipLabel.isHidden = false
-            title = "运维工具"
+            self.navigationItem.title = "运维工具"
             return
         }
 
@@ -302,7 +305,7 @@ final class GlobalOpsViewController: UIViewController {
         }
 
         tipLabel.isHidden = true
-        title = "运维 (\(server.name))"
+        self.navigationItem.title = "运维 (\(server.name))"
         currentServerId = server.id
 
         opsVC?.view.removeFromSuperview()

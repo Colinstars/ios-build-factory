@@ -26,8 +26,9 @@ final class ServerDetailViewController: UIViewController {
         self.server = server
         self.session = SSHSession(server: server)
         super.init(nibName: nil, bundle: nil)
-        // 关键体验修复：构造器第 0 毫秒锁定标题与小标题模式，彻底消除转场文字卡顿
-        self.title = server.name
+        // 关键修复：绝不能调用 self.title = server.name！
+        // 因为 UIViewController.title 会级联向上篡改 UITabBarController 对应 TabBarItem 的文本！
+        // 只赋值 navigationItem.title，确保底部 Tab 始终是【状态】，永不被篡改为 DMIT 示例！
         self.navigationItem.title = server.name
         self.navigationItem.largeTitleDisplayMode = .never
     }

@@ -162,9 +162,14 @@ extension AddServerViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
         cell.selectionStyle = .none
-        // 彻底锁定输入框卡片颜色：恒为白色（亮色模式下纯白卡片，暗色模式下深灰卡片），彻底解决未展开前变灰 bug！
-        cell.backgroundColor = .secondarySystemGroupedBackground
-        cell.contentView.backgroundColor = .secondarySystemGroupedBackground
+        
+        // 关键视觉修复：解决先提一半 (medium) 时系统遮罩让卡片变灰的顽疾！
+        // 显式指定 UIBackgroundConfiguration，强制填充系统纯白/纯净卡片色，并赋予 1px 细微边界！
+        // 无论抽屉是 medium 半展开还是 large 全展开，输入框从第 0 毫秒起始终保持与展开后完全一致的纯白通透卡片质感！
+        var bg = UIBackgroundConfiguration.listGroupedCell()
+        bg.backgroundColor = .secondarySystemGroupedBackground
+        cell.backgroundConfiguration = bg
+        cell.contentView.backgroundColor = .clear
 
         let labelWidth: CGFloat = 80
         let titleLabel = UILabel()
