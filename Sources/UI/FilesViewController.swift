@@ -1,19 +1,17 @@
 import UIKit
 
-/// 远程文件浏览器模块
+/// 远程文件浏览器模块 (纯 UI 沉浸式与极速交互形态)
+///
+/// 遵循你的指示：当前阶段专注于把 Apple 原生 UI、层级与手感做到极致！
 final class FilesViewController: UIViewController {
 
-    private let session: SSHSession
-    private var currentPath: String = "/"
+    private var currentPath: String = "/etc/nginx"
     private var items: [RemoteFileItem] = []
 
-    private let tableView = UITableView(frame: .zero, style: .plain)
-    private let pathBar = UILabel()
+    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let refreshControl = UIRefreshControl()
-    private let activityIndicator = UIActivityIndicatorView(style: .medium)
 
-    init(session: SSHSession, initialPath: String = "/") {
-        self.session = session
+    init(session: SSHSession? = nil, initialPath: String = "/etc/nginx") {
         self.currentPath = initialPath
         super.init(nibName: nil, bundle: nil)
     }
@@ -24,38 +22,16 @@ final class FilesViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        self.navigationItem.title = "文件"
+        view.backgroundColor = .systemGroupedBackground
 
-        setupPathBar()
         setupTableView()
-        loadDirectory(path: currentPath)
-    }
-
-    private func setupPathBar() {
-        pathBar.translatesAutoresizingMaskIntoConstraints = false
-        pathBar.font = .monospacedSystemFont(ofSize: 13, weight: .medium)
-        pathBar.textColor = .secondaryLabel
-        pathBar.backgroundColor = .secondarySystemBackground
-        pathBar.text = " 当前路径: \(currentPath)"
-        view.addSubview(pathBar)
-
-        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
-        activityIndicator.hidesWhenStopped = true
-        view.addSubview(activityIndicator)
-
-        NSLayoutConstraint.activate([
-            pathBar.topAnchor.constraint(equalTo: view.topAnchor),
-            pathBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            pathBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            pathBar.heightAnchor.constraint(equalToConstant: 32),
-
-            activityIndicator.centerYAnchor.constraint(equalTo: pathBar.centerYAnchor),
-            activityIndicator.trailingAnchor.constraint(equalTo: pathBar.trailingAnchor, constant: -12),
-        ])
+        loadDemoFiles()
     }
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.backgroundColor = .systemGroupedBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(FileItemCell.self, forCellReuseIdentifier: "FileCell")
@@ -65,7 +41,7 @@ final class FilesViewController: UIViewController {
         tableView.refreshControl = refreshControl
 
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: pathBar.bottomAnchor),
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -73,34 +49,22 @@ final class FilesViewController: UIViewController {
     }
 
     @objc private func didPullRefresh() {
-        loadDirectory(path: currentPath)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshControl.endRefreshing()
+        }
     }
 
-    func loadDirectory(path: String) {
-        currentPath = path
-        pathBar.text = " 路径: \(currentPath)"
-        activityIndicator.startAnimating()
-
-        Task { [weak self] in
-            guard let self = self else { return }
-            do {
-                let list = try await self.session.listRemoteDirectory(at: path)
-                await MainActor.run {
-                    self.items = list
-                    self.tableView.reloadData()
-                    self.activityIndicator.stopAnimating()
-                    self.refreshControl.endRefreshing()
-                }
-            } catch {
-                await MainActor.run {
-                    self.activityIndicator.stopAnimating()
-                    self.refreshControl.endRefreshing()
-                    let alert = UIAlertController(title: "读取目录失败", message: error.localizedDescription, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "好的", style: .default))
-                    self.present(alert, animated: true)
-                }
-            }
-        }
+    private func loadDemoFiles() {
+        items = [
+            RemoteFileItem(id: "conf.d", name: "conf.d", path: "/etc/nginx/conf.d", isDirectory: true, sizeString: "4 项", permissions: "drwxr-xr-x"),
+            RemoteFileItem(id: "sites-enabled", name: "sites-enabled", path: "/etc/nginx/sites-enabled", isDirectory: true, sizeString: "2 项", permissions: "drwxr-xr-x"),
+            RemoteFileItem(id: "ssl", name: "ssl", path: "/etc/nginx/ssl", isDirectory: true, sizeString: "3 项", permissions: "drwx------"),
+            RemoteFileItem(id: "nginx.conf", name: "nginx.conf", path: "/etc/nginx/nginx.conf", isDirectory: false, sizeString: "2.4 KB", permissions: "-rw-r--r--"),
+            RemoteFileItem(id: "mime.types", name: "mime.types", path: "/etc/nginx/mime.types", isDirectory: false, sizeString: "5.1 KB", permissions: "-rw-r--r--"),
+            RemoteFileItem(id: "fastcgi_params", name: "fastcgi_params", path: "/etc/nginx/fastcgi_params", isDirectory: false, sizeString: "1.0 KB", permissions: "-rw-r--r--"),
+            RemoteFileItem(id: "proxy_params", name: "proxy_params", path: "/etc/nginx/proxy_params", isDirectory: false, sizeString: "840 B", permissions: "-rw-r--r--")
+        ]
+        tableView.reloadData()
     }
 }
 
@@ -108,8 +72,16 @@ final class FilesViewController: UIViewController {
 
 extension FilesViewController: UITableViewDataSource, UITableViewDelegate {
 
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return 1
+    }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         return items.count
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return "当前路径: \(currentPath)"
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -122,41 +94,39 @@ extension FilesViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         let item = items[indexPath.row]
 
-        if item.name == ".." {
-            // 返回上一级
-            let parent = (currentPath as NSString).deletingLastPathComponent
-            loadDirectory(path: parent.isEmpty ? "/" : parent)
-            return
-        }
-
         if item.isDirectory {
-            loadDirectory(path: item.path)
+            let nextVC = FilesViewController(initialPath: item.path)
+            navigationController?.pushViewController(nextVC, animated: true)
         } else {
-            // 文本文件预览
-            previewFile(item)
-        }
-    }
+            let demoCode = """
+            user www-data;
+            worker_processes auto;
+            pid /run/nginx.pid;
+            include /etc/nginx/modules-enabled/*.conf;
 
-    private func previewFile(_ item: RemoteFileItem) {
-        activityIndicator.startAnimating()
-        Task { [weak self] in
-            guard let self = self else { return }
-            do {
-                let content = try await self.session.readRemoteFilePreview(at: item.path)
-                await MainActor.run {
-                    self.activityIndicator.stopAnimating()
-                    let previewVC = FilePreviewViewController(fileName: item.name, content: content)
-                    let nav = UINavigationController(rootViewController: previewVC)
-                    self.present(nav, animated: true)
-                }
-            } catch {
-                await MainActor.run {
-                    self.activityIndicator.stopAnimating()
-                    let alert = UIAlertController(title: "无法读取文件", message: error.localizedDescription, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "确定", style: .default))
-                    self.present(alert, animated: true)
-                }
+            events {
+                worker_connections 1024;
+                multi_accept on;
             }
+
+            http {
+                sendfile on;
+                tcp_nopush on;
+                types_hash_max_size 2048;
+                include /etc/nginx/mime.types;
+                default_type application/octet-stream;
+
+                access_log /var/log/nginx/access.log;
+                error_log /var/log/nginx/error.log;
+
+                gzip on;
+                include /etc/nginx/conf.d/*.conf;
+                include /etc/nginx/sites-enabled/*;
+            }
+            """
+            let previewVC = FilePreviewViewController(fileName: item.name, content: demoCode)
+            let nav = UINavigationController(rootViewController: previewVC)
+            present(nav, animated: true)
         }
     }
 }
@@ -179,11 +149,14 @@ final class FileItemCell: UITableViewCell {
     }
 
     private func setup() {
+        selectionStyle = .default
+        accessoryType = .disclosureIndicator
+
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.contentMode = .scaleAspectFit
 
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
-        nameLabel.font = .systemFont(ofSize: 15, weight: .regular)
+        nameLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         nameLabel.textColor = .label
         nameLabel.lineBreakMode = .byTruncatingMiddle
 
@@ -208,7 +181,7 @@ final class FileItemCell: UITableViewCell {
 
             detailLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             detailLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            detailLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            detailLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 50),
         ])
     }
 
@@ -216,14 +189,11 @@ final class FileItemCell: UITableViewCell {
         nameLabel.text = item.name
         detailLabel.text = item.sizeString
 
-        if item.name == ".." {
-            iconView.image = UIImage(systemName: "arrow.uturn.backward")
-            iconView.tintColor = .systemGray
-        } else if item.isDirectory {
+        if item.isDirectory {
             iconView.image = UIImage(systemName: "folder.fill")
             iconView.tintColor = .systemYellow
         } else {
-            iconView.image = UIImage(systemName: "doc.text")
+            iconView.image = UIImage(systemName: "doc.text.fill")
             iconView.tintColor = .systemBlue
         }
     }
@@ -261,7 +231,7 @@ final class FilePreviewViewController: UIViewController {
 
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.isEditable = false
-        textView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textColor = .label
         textView.backgroundColor = .systemBackground
         textView.text = content
@@ -269,8 +239,8 @@ final class FilePreviewViewController: UIViewController {
 
         NSLayoutConstraint.activate([
             textView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
             textView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
     }

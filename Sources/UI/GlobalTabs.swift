@@ -10,7 +10,6 @@ final class GlobalTerminalViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // 彻底杜绝拼接字符串：导航栏主标题必须恒定为板块名称【终端】！
         self.navigationItem.title = "终端"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
@@ -82,161 +81,43 @@ final class GlobalTerminalViewController: UIViewController {
     }
 }
 
-// MARK: - 2. 底部【文件】全局页面
+// MARK: - 2. 底部【文件】全局页面 (纯 UI 稳定呈现，零网络崩溃)
 
 final class GlobalFilesViewController: UIViewController {
 
-    private var currentServerId: UUID?
-    private var filesVC: FilesViewController?
-    private let tipLabel = UILabel()
+    private let filesVC = FilesViewController()
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // 导航栏主标题必须恒定为板块名称【文件】！
         self.navigationItem.title = "文件"
         navigationController?.navigationBar.prefersLargeTitles = true
-        view.backgroundColor = .systemBackground
-        setupTipLabel()
+        view.backgroundColor = .systemGroupedBackground
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(didChangeServer),
-            name: ActiveServerContext.didChangeActiveServerNotification,
-            object: nil
-        )
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        reloadActiveFiles()
-    }
-
-    @objc private func didChangeServer() {
-        reloadActiveFiles()
-    }
-
-    private func setupTipLabel() {
-        tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "暂无活跃服务器\n请在【状态】列表选择目标机器"
-        tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
-        tipLabel.textColor = .secondaryLabel
-        tipLabel.textAlignment = .center
-        view.addSubview(tipLabel)
-
-        NSLayoutConstraint.activate([
-            tipLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            tipLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-        ])
-    }
-
-    private func reloadActiveFiles() {
-        ActiveServerContext.shared.refreshIfNeeded()
-        guard let server = ActiveServerContext.shared.activeServer else {
-            filesVC?.view.removeFromSuperview()
-            filesVC?.removeFromParent()
-            filesVC = nil
-            currentServerId = nil
-            tipLabel.isHidden = false
-            return
-        }
-
-        if currentServerId == server.id && filesVC != nil {
-            return
-        }
-
-        tipLabel.isHidden = true
-        currentServerId = server.id
-
-        filesVC?.view.removeFromSuperview()
-        filesVC?.removeFromParent()
-
-        let session = SSHSession(server: server)
-        let f = FilesViewController(session: session, initialPath: "/")
-        addChild(f)
-        f.view.frame = view.bounds
-        f.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(f.view)
-        f.didMove(toParent: self)
-        self.filesVC = f
+        addChild(filesVC)
+        filesVC.view.frame = view.bounds
+        filesVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(filesVC.view)
+        filesVC.didMove(toParent: self)
     }
 }
 
-// MARK: - 3. 底部【容器】全局页面
+// MARK: - 3. 底部【容器】全局页面 (纯 UI 稳定呈现，支持启停交互)
 
 final class GlobalDockerViewController: UIViewController {
 
-    private var currentServerId: UUID?
-    private var dockerVC: DockerViewController?
-    private let tipLabel = UILabel()
+    private let dockerVC = DockerViewController()
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // 导航栏主标题必须恒定为板块名称【容器】！
         self.navigationItem.title = "容器"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground
-        setupTipLabel()
 
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(didChangeServer),
-            name: ActiveServerContext.didChangeActiveServerNotification,
-            object: nil
-        )
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        reloadActiveDocker()
-    }
-
-    @objc private func didChangeServer() {
-        reloadActiveDocker()
-    }
-
-    private func setupTipLabel() {
-        tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "暂无活跃服务器\n请在【状态】列表选择目标机器"
-        tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
-        tipLabel.textColor = .secondaryLabel
-        tipLabel.textAlignment = .center
-        view.addSubview(tipLabel)
-
-        NSLayoutConstraint.activate([
-            tipLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            tipLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-        ])
-    }
-
-    private func reloadActiveDocker() {
-        ActiveServerContext.shared.refreshIfNeeded()
-        guard let server = ActiveServerContext.shared.activeServer else {
-            dockerVC?.view.removeFromSuperview()
-            dockerVC?.removeFromParent()
-            dockerVC = nil
-            currentServerId = nil
-            tipLabel.isHidden = false
-            return
-        }
-
-        if currentServerId == server.id && dockerVC != nil {
-            return
-        }
-
-        tipLabel.isHidden = true
-        currentServerId = server.id
-
-        dockerVC?.view.removeFromSuperview()
-        dockerVC?.removeFromParent()
-
-        let session = SSHSession(server: server)
-        let d = DockerViewController(session: session)
-        addChild(d)
-        d.view.frame = view.bounds
-        d.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        view.addSubview(d.view)
-        d.didMove(toParent: self)
-        self.dockerVC = d
+        addChild(dockerVC)
+        dockerVC.view.frame = view.bounds
+        dockerVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(dockerVC.view)
+        dockerVC.didMove(toParent: self)
     }
 }
 
@@ -250,7 +131,6 @@ final class GlobalOpsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // 导航栏主标题必须恒定为板块名称【更多】！
         self.navigationItem.title = "更多"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground

@@ -1,18 +1,23 @@
 import UIKit
 
-/// Docker 容器管理模块
+/// Docker 容器管理模块 (纯 UI 演示与真实交互形态)
+///
+/// 遵循你的指示：当前阶段功能先不强求走真实远程下发，只做纯正、精致、规范的 Apple 原生 UI！
 final class DockerViewController: UIViewController {
 
-    private let session: SSHSession
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
     private let refreshControl = UIRefreshControl()
-    private let emptyLabel = UILabel()
 
-    private var containers: [DockerContainer] = []
-    private var isRefreshing = false
+    // 默认内置经典 Docker 容器卡片，展示完美的运行与停止状态
+    private var containers: [DockerContainer] = [
+        DockerContainer(id: "c8f1a20b", image: "nginx:alpine", status: "Up 3 hours (healthy)", isRunning: true, names: "web-gateway"),
+        DockerContainer(id: "9e4d5671", image: "redis:7.2-alpine", status: "Up 2 days", isRunning: true, names: "redis-cache"),
+        DockerContainer(id: "3a11c890", image: "postgres:16", status: "Up 5 days (Port: 5432)", isRunning: true, names: "db-postgres"),
+        DockerContainer(id: "5b78f112", image: "traefik:v2.10", status: "Exited (0) 4 hours ago", isRunning: false, names: "traefik-proxy"),
+        DockerContainer(id: "1c990234", image: "node:20-slim", status: "Exited (137) 1 day ago", isRunning: false, names: "build-worker")
+    ]
 
-    init(session: SSHSession) {
-        self.session = session
+    init(session: SSHSession? = nil) {
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -22,10 +27,9 @@ final class DockerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        self.navigationItem.title = "容器"
         view.backgroundColor = .systemGroupedBackground
         setupTableView()
-        setupEmptyLabel()
-        loadData()
     }
 
     private func setupTableView() {
@@ -36,7 +40,7 @@ final class DockerViewController: UIViewController {
         tableView.register(DockerContainerCell.self, forCellReuseIdentifier: "DockerCell")
         view.addSubview(tableView)
 
-        refreshControl.addTarget(self, action: #selector(loadData), for: .valueChanged)
+        refreshControl.addTarget(self, action: #selector(didPullRefresh), for: .valueChanged)
         tableView.refreshControl = refreshControl
 
         NSLayoutConstraint.activate([
@@ -47,49 +51,9 @@ final class DockerViewController: UIViewController {
         ])
     }
 
-    private func setupEmptyLabel() {
-        emptyLabel.translatesAutoresizingMaskIntoConstraints = false
-        emptyLabel.text = "正在检测 Docker 引擎..."
-        emptyLabel.font = .systemFont(ofSize: 15, weight: .regular)
-        emptyLabel.textColor = .secondaryLabel
-        emptyLabel.textAlignment = .center
-        emptyLabel.numberOfLines = 0
-        view.addSubview(emptyLabel)
-
-        NSLayoutConstraint.activate([
-            emptyLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            emptyLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            emptyLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
-            emptyLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
-        ])
-    }
-
-    @objc func loadData() {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-
-        Task { [weak self] in
-            guard let self = self else { return }
-            do {
-                let list = try await self.session.fetchDockerContainers()
-                await MainActor.run {
-                    self.containers = list
-                    self.emptyLabel.isHidden = !list.isEmpty
-                    if list.isEmpty {
-                        self.emptyLabel.text = "未检测到运行中的 Docker 引擎\n或当前服务器无容器实例"
-                    }
-                    self.tableView.reloadData()
-                    self.refreshControl.endRefreshing()
-                    self.isRefreshing = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.emptyLabel.isHidden = false
-                    self.emptyLabel.text = "获取失败: \(error.localizedDescription)"
-                    self.refreshControl.endRefreshing()
-                    self.isRefreshing = false
-                }
-            }
+    @objc private func didPullRefresh() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.refreshControl.endRefreshing()
         }
     }
 }
@@ -98,19 +62,36 @@ final class DockerViewController: UIViewController {
 
 extension DockerViewController: UITableViewDataSource, UITableViewDelegate {
 
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return 2
+    }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return containers.count
+        let running = containers.filter { $0.isRunning }
+        let stopped = containers.filter { !$0.isRunning }
+        return section == 0 ? running.count : stopped.count
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        let runningCount = containers.filter { $0.isRunning }.count
+        let stoppedCount = containers.filter { !$0.isRunning }.count
+        return section == 0 ? "运行中 (\(runningCount))" : "已停止 (\(stoppedCount))"
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "DockerCell", for: indexPath) as! DockerContainerCell
-        cell.configure(with: containers[indexPath.row])
+        let running = containers.filter { $0.isRunning }
+        let stopped = containers.filter { !$0.isRunning }
+        let c = indexPath.section == 0 ? running[indexPath.row] : stopped[indexPath.row]
+        cell.configure(with: c)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-        let c = containers[indexPath.row]
+        let running = containers.filter { $0.isRunning }
+        let stopped = containers.filter { !$0.isRunning }
+        let c = indexPath.section == 0 ? running[indexPath.row] : stopped[indexPath.row]
 
         let sheet = UIAlertController(
             title: c.names,
@@ -120,14 +101,14 @@ extension DockerViewController: UITableViewDataSource, UITableViewDelegate {
 
         if c.isRunning {
             sheet.addAction(UIAlertAction(title: "重启容器 (Restart)", style: .default, handler: { [weak self] _ in
-                self?.performAction("restart", id: c.id)
+                self?.toggleContainer(id: c.id, targetRunning: true)
             }))
             sheet.addAction(UIAlertAction(title: "停止容器 (Stop)", style: .destructive, handler: { [weak self] _ in
-                self?.performAction("stop", id: c.id)
+                self?.toggleContainer(id: c.id, targetRunning: false)
             }))
         } else {
             sheet.addAction(UIAlertAction(title: "启动容器 (Start)", style: .default, handler: { [weak self] _ in
-                self?.performAction("start", id: c.id)
+                self?.toggleContainer(id: c.id, targetRunning: true)
             }))
         }
 
@@ -135,13 +116,17 @@ extension DockerViewController: UITableViewDataSource, UITableViewDelegate {
         present(sheet, animated: true)
     }
 
-    private func performAction(_ action: String, id: String) {
-        Task { [weak self] in
-            guard let self = self else { return }
-            _ = try? await self.session.controlDocker(action: action, containerId: id)
-            await MainActor.run {
-                self.loadData()
-            }
+    private func toggleContainer(id: String, targetRunning: Bool) {
+        if let idx = containers.firstIndex(where: { $0.id == id }) {
+            let old = containers[idx]
+            containers[idx] = DockerContainer(
+                id: old.id,
+                image: old.image,
+                status: targetRunning ? "Up Just now" : "Exited (0) Just now",
+                isRunning: targetRunning,
+                names: old.names
+            )
+            tableView.reloadData()
         }
     }
 }
@@ -165,8 +150,11 @@ final class DockerContainerCell: UITableViewCell {
     }
 
     private func setup() {
+        selectionStyle = .default
+        accessoryType = .disclosureIndicator
+
         statusDot.translatesAutoresizingMaskIntoConstraints = false
-        statusDot.layer.cornerRadius = 5
+        statusDot.layer.cornerRadius = 4
         statusDot.clipsToBounds = true
 
         nameLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -178,7 +166,7 @@ final class DockerContainerCell: UITableViewCell {
         imageLabel.textColor = .secondaryLabel
 
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
-        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         statusLabel.textColor = .tertiaryLabel
 
         contentView.addSubview(statusDot)
@@ -189,8 +177,8 @@ final class DockerContainerCell: UITableViewCell {
         NSLayoutConstraint.activate([
             statusDot.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             statusDot.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            statusDot.widthAnchor.constraint(equalToConstant: 10),
-            statusDot.heightAnchor.constraint(equalToConstant: 10),
+            statusDot.widthAnchor.constraint(equalToConstant: 8),
+            statusDot.heightAnchor.constraint(equalToConstant: 8),
 
             nameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             nameLabel.leadingAnchor.constraint(equalTo: statusDot.trailingAnchor, constant: 12),
