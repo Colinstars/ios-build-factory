@@ -1,0 +1,38 @@
+name: probe
+on:
+  workflow_dispatch:
+  push:
+    branches: [ probe ]
+
+jobs:
+  probe:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: 列出可用 Xcode 与 SDK
+        run: |
+          echo "===== /Applications ====="
+          ls -1 /Applications | grep -i xcode || true
+          echo "===== 每个 Xcode 的版本 ====="
+          for x in /Applications/Xcode*.app; do
+            echo "--- $x"
+            "$x/Contents/Developer/usr/bin/xcodebuild" -version 2>/dev/null || echo "  (无法读取)"
+          done
+          echo "===== 当前选中 ====="
+          xcodebuild -version || true
+          echo "===== 默认 iOS SDK ====="
+          xcrun --sdk iphoneos --show-sdk-version || true
+          echo "===== 所有 iOS SDK ====="
+          xcodebuild -showsdks 2>/dev/null | grep -i ios || true
+          echo "===== 检查 Liquid Glass 符号是否存在于 SDK ====="
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "SDK PATH: $SDK"
+          if [ -f "$SDK/System/Library/Frameworks/UIKit.framework/Headers/UIGlassEffect.h" ]; then
+            echo "FOUND: UIGlassEffect.h"
+            grep -m5 -E "interface UIGlassEffect|UIGlassContainerEffect" "$SDK/System/Library/Frameworks/UIKit.framework/Headers/UIGlassEffect.h" || true
+          else
+            echo "NOT FOUND: UIGlassEffect.h"
+          fi
+          ls "$SDK/System/Library/Frameworks/"/Glass*.framework 2>/dev/null || true
+          echo "===== SwiftUI glassEffect 符号 ====="
+          grep -rl "glassEffect" "$SDK/System/Library/Frameworks/SwiftUI.framework/Modules" 2>/dev/null | head -3 || echo "no swiftinterface hit"
