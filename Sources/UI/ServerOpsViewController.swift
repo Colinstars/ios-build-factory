@@ -46,8 +46,6 @@ final class ServerOpsViewController: UIViewController {
         tableView.delegate = self
         tableView.register(ProcessItemCell.self, forCellReuseIdentifier: "ProcessCell")
         
-        // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
-        tableView.applyLiquidGlassSoftEdgeEffect()
         
         view.addSubview(tableView)
 

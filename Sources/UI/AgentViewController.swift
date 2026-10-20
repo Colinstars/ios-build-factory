@@ -105,8 +105,6 @@ final class AgentViewController: UIViewController {
         tableView.keyboardDismissMode = .onDrag
         tableView.register(AgentBubbleCell.self, forCellReuseIdentifier: "BubbleCell")
         
-        // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
-        tableView.applyLiquidGlassSoftEdgeEffect()
 
         view.addSubview(tableView)
     }

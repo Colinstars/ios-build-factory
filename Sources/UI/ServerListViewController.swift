@@ -1,30 +1,23 @@
 import UIKit
 
-/// 服务器列表主页。
-///
-/// 遵循 Apple HIG Navigation Bars 与 Lists 规范：
-/// 1. 彻底恢复 iOS 标准大标题生命周期：
-///    未滚动时，大标题【主机】自然在左上角舒展，背景与系统底色 100% 融合一体，没有一丝一毫的断崖切线！
-/// 2. 只有向上滚动卡片时，大标题才自然平滑收缩为小标题，并呼出通透的磨砂遮罩！
+/// 主机列表 —— 完全使用 Apple 出厂原生组件，零自定义外观代码。
 final class ServerListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
-    private let floatingAddButton = GlassSurface(variant: .regular, cornerRadius: 28)
-    private let addIcon = UIImageView()
-
     private var servers: [Server] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "主机"
-        // 关键：标准大标题模式，绝不强行加硬约束
-        self.navigationItem.largeTitleDisplayMode = .always
-        navigationController?.navigationBar.prefersLargeTitles = true
-
+        title = "主机"
         view.backgroundColor = .systemGroupedBackground
 
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .add,
+            target: self,
+            action: #selector(didTapAdd)
+        )
+
         setupTableView()
-        setupFloatingAddButton()
         reload()
     }
 
@@ -38,21 +31,14 @@ final class ServerListViewController: UIViewController {
         tableView.reloadData()
     }
 
-    // MARK: - Setup UI
-
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.backgroundColor = .systemGroupedBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ServerCell.self, forCellReuseIdentifier: "ServerCell")
-        
-        // 核心参数：开启 iOS 26 专属 .soft 柔和极透边缘效果！
-        tableView.applyLiquidGlassSoftEdgeEffect()
-        
         view.addSubview(tableView)
 
-        // 关键布局修复：遵照 iOS 标准滚动视图布局规范，安全地贴紧 view 的四个边缘
         NSLayoutConstraint.activate([
             tableView.topAnchor.constraint(equalTo: view.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -61,48 +47,16 @@ final class ServerListViewController: UIViewController {
         ])
     }
 
-    /// 功能层：浮动添加按钮。
-    private func setupFloatingAddButton() {
-        floatingAddButton.translatesAutoresizingMaskIntoConstraints = false
-        floatingAddButton.setInteractive(true)
-
-        addIcon.translatesAutoresizingMaskIntoConstraints = false
-        let cfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .semibold)
-        addIcon.image = UIImage(systemName: "plus", withConfiguration: cfg)
-        addIcon.tintColor = .systemBlue
-        addIcon.contentMode = .center
-
-        floatingAddButton.addSubview(addIcon)
-        view.addSubview(floatingAddButton)
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(didTapAdd))
-        floatingAddButton.addGestureRecognizer(tap)
-
-        NSLayoutConstraint.activate([
-            floatingAddButton.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            floatingAddButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
-            floatingAddButton.widthAnchor.constraint(equalToConstant: 56),
-            floatingAddButton.heightAnchor.constraint(equalToConstant: 56),
-
-            addIcon.centerXAnchor.constraint(equalTo: floatingAddButton.centerXAnchor),
-            addIcon.centerYAnchor.constraint(equalTo: floatingAddButton.centerYAnchor),
-        ])
-    }
-
-    // MARK: - Actions (遵循 HIG Sheets 规范)
-
     @objc private func didTapAdd() {
         let addVC = AddServerViewController()
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
-        nav.view.backgroundColor = SheetColorScheme.background
-        
+
         if let sheet = nav.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = true
-            sheet.preferredCornerRadius = 24
         }
-        
+
         present(nav, animated: true)
     }
 }
@@ -121,11 +75,10 @@ extension ServerListViewController: AddServerViewControllerDelegate {
 extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return servers.count
+        servers.count
     }
 
-    func tableView(_ tableView: UITableView,
-                   cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ServerCell", for: indexPath) as! ServerCell
         cell.configure(with: servers[indexPath.row])
         return cell
@@ -135,10 +88,9 @@ extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         let s = servers[indexPath.row]
         ActiveServerContext.shared.setActiveServer(s)
-        
+
         navigationItem.backButtonTitle = ""
-        let detail = ServerDetailViewController(server: s)
-        navigationController?.pushViewController(detail, animated: true)
+        navigationController?.pushViewController(ServerDetailViewController(server: s), animated: true)
     }
 
     func tableView(_ tableView: UITableView,
