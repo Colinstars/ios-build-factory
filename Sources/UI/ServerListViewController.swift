@@ -89,9 +89,10 @@ final class ServerListViewController: UIViewController {
         addVC.delegate = self
         let nav = UINavigationController(rootViewController: addVC)
         
-        // 采用 iOS 15+ 现代 Page Sheet 质感
+        // 关键体验修复：只使用 [.large()] 全展开模式！
+        // 彻底杜绝 medium 半展开时系统调光 (Dimming) 导致的输入框变灰反差 bug！
         if let sheet = nav.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
+            sheet.detents = [.large()]
             sheet.prefersGrabberVisible = true
             sheet.preferredCornerRadius = 24
         }

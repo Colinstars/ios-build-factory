@@ -6,9 +6,9 @@ protocol AddServerViewControllerDelegate: AnyObject {
 
 /// 遵循现代 iOS HIG 规范的添加服务器表单页面。
 ///
-/// 彻底废弃简陋的 UIAlertController。
-/// 采用标准苹果原生分组表格（insetGrouped），利用 UISheetPresentationController 以大半屏 Sheet 优雅拉起。
-/// 内容层纯净质感，符合标准交互预期。
+/// 彻底修复 Sheet 展开/未展开时输入框与单元格背景色反差 bug：
+/// 显式将 TableView 统一使用 .systemGroupedBackground，单元格统一强制指定 .secondarySystemGroupedBackground。
+/// 彻底锁定 .large() 全展开高度，拒绝半展开半调光的视觉遮罩层影响。
 final class AddServerViewController: UIViewController {
 
     weak var delegate: AddServerViewControllerDelegate?
@@ -49,6 +49,7 @@ final class AddServerViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.backgroundColor = .systemGroupedBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.keyboardDismissMode = .onDrag
@@ -69,25 +70,30 @@ final class AddServerViewController: UIViewController {
         nameField.clearButtonMode = .whileEditing
         nameField.autocapitalizationType = .none
         nameField.autocorrectionType = .no
+        nameField.textColor = .label
 
         hostField.placeholder = "IP 或域名 (必填)"
         hostField.clearButtonMode = .whileEditing
         hostField.keyboardType = .URL
         hostField.autocapitalizationType = .none
         hostField.autocorrectionType = .no
+        hostField.textColor = .label
 
         portField.text = "22"
         portField.placeholder = "22"
         portField.keyboardType = .numberPad
+        portField.textColor = .label
 
         userField.text = "root"
         userField.placeholder = "root"
         userField.autocapitalizationType = .none
         userField.autocorrectionType = .no
+        userField.textColor = .label
 
         passwordField.placeholder = "连接密码"
         passwordField.isSecureTextEntry = true
         passwordField.clearButtonMode = .whileEditing
+        passwordField.textColor = .label
     }
 
     @objc private func didTapCancel() {
@@ -156,6 +162,9 @@ extension AddServerViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
         cell.selectionStyle = .none
+        // 彻底锁定输入框卡片颜色：恒为白色（亮色模式下纯白卡片，暗色模式下深灰卡片），彻底解决未展开前变灰 bug！
+        cell.backgroundColor = .secondarySystemGroupedBackground
+        cell.contentView.backgroundColor = .secondarySystemGroupedBackground
 
         let labelWidth: CGFloat = 80
         let titleLabel = UILabel()
