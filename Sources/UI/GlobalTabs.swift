@@ -1,10 +1,10 @@
 import UIKit
 
-// MARK: - 1. 底部【终端】全局页面
+// MARK: - 1. 底部【终端】全局页面 (响应全局上下文)
 
 final class GlobalTerminalViewController: UIViewController {
 
-    private var activeSession: SSHSession?
+    private var currentServerId: UUID?
     private var terminalVC: TerminalViewController?
     private let tipLabel = UILabel()
 
@@ -13,6 +13,13 @@ final class GlobalTerminalViewController: UIViewController {
         title = "终端"
         view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
         setupTipLabel()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didChangeServer),
+            name: ActiveServerContext.didChangeActiveServerNotification,
+            object: nil
+        )
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -20,9 +27,13 @@ final class GlobalTerminalViewController: UIViewController {
         reloadActiveTerminal()
     }
 
+    @objc private func didChangeServer() {
+        reloadActiveTerminal()
+    }
+
     private func setupTipLabel() {
         tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "请先在【状态】页面添加并选择一台服务器"
+        tipLabel.text = "暂无连接目标\n请在【状态】列表点击任意服务器切换上下文"
         tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -38,28 +49,36 @@ final class GlobalTerminalViewController: UIViewController {
     }
 
     private func reloadActiveTerminal() {
-        guard let firstServer = ServerStore.shared.servers.first else {
+        ActiveServerContext.shared.refreshIfNeeded()
+        guard let server = ActiveServerContext.shared.activeServer else {
             terminalVC?.view.removeFromSuperview()
             terminalVC?.removeFromParent()
             terminalVC = nil
+            currentServerId = nil
             tipLabel.isHidden = false
+            title = "终端"
             return
         }
 
-        tipLabel.isHidden = true
-        title = "终端 - \(firstServer.name)"
-
-        if terminalVC == nil {
-            let session = SSHSession(server: firstServer)
-            self.activeSession = session
-            let term = TerminalViewController(session: session)
-            addChild(term)
-            term.view.frame = view.bounds
-            term.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(term.view)
-            term.didMove(toParent: self)
-            self.terminalVC = term
+        if currentServerId == server.id && terminalVC != nil {
+            return // 已就绪，保持会话不重连
         }
+
+        tipLabel.isHidden = true
+        title = "终端 (\(server.name))"
+        currentServerId = server.id
+
+        terminalVC?.view.removeFromSuperview()
+        terminalVC?.removeFromParent()
+
+        let session = SSHSession(server: server)
+        let term = TerminalViewController(session: session)
+        addChild(term)
+        term.view.frame = view.bounds
+        term.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(term.view)
+        term.didMove(toParent: self)
+        self.terminalVC = term
     }
 }
 
@@ -67,6 +86,7 @@ final class GlobalTerminalViewController: UIViewController {
 
 final class GlobalFilesViewController: UIViewController {
 
+    private var currentServerId: UUID?
     private var filesVC: FilesViewController?
     private let tipLabel = UILabel()
 
@@ -75,6 +95,13 @@ final class GlobalFilesViewController: UIViewController {
         title = "文件"
         view.backgroundColor = .systemBackground
         setupTipLabel()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didChangeServer),
+            name: ActiveServerContext.didChangeActiveServerNotification,
+            object: nil
+        )
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -82,9 +109,13 @@ final class GlobalFilesViewController: UIViewController {
         reloadActiveFiles()
     }
 
+    @objc private func didChangeServer() {
+        reloadActiveFiles()
+    }
+
     private func setupTipLabel() {
         tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "请先在【状态】页面添加并配置服务器"
+        tipLabel.text = "暂无活跃服务器\n请在【状态】列表选择目标机器"
         tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -97,27 +128,36 @@ final class GlobalFilesViewController: UIViewController {
     }
 
     private func reloadActiveFiles() {
-        guard let firstServer = ServerStore.shared.servers.first else {
+        ActiveServerContext.shared.refreshIfNeeded()
+        guard let server = ActiveServerContext.shared.activeServer else {
             filesVC?.view.removeFromSuperview()
             filesVC?.removeFromParent()
             filesVC = nil
+            currentServerId = nil
             tipLabel.isHidden = false
+            title = "文件"
+            return
+        }
+
+        if currentServerId == server.id && filesVC != nil {
             return
         }
 
         tipLabel.isHidden = true
-        title = "文件 - \(firstServer.name)"
+        title = "文件 (\(server.name))"
+        currentServerId = server.id
 
-        if filesVC == nil {
-            let session = SSHSession(server: firstServer)
-            let f = FilesViewController(session: session, initialPath: "/")
-            addChild(f)
-            f.view.frame = view.bounds
-            f.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(f.view)
-            f.didMove(toParent: self)
-            self.filesVC = f
-        }
+        filesVC?.view.removeFromSuperview()
+        filesVC?.removeFromParent()
+
+        let session = SSHSession(server: server)
+        let f = FilesViewController(session: session, initialPath: "/")
+        addChild(f)
+        f.view.frame = view.bounds
+        f.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(f.view)
+        f.didMove(toParent: self)
+        self.filesVC = f
     }
 }
 
@@ -125,6 +165,7 @@ final class GlobalFilesViewController: UIViewController {
 
 final class GlobalDockerViewController: UIViewController {
 
+    private var currentServerId: UUID?
     private var dockerVC: DockerViewController?
     private let tipLabel = UILabel()
 
@@ -133,6 +174,13 @@ final class GlobalDockerViewController: UIViewController {
         title = "容器"
         view.backgroundColor = .systemGroupedBackground
         setupTipLabel()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didChangeServer),
+            name: ActiveServerContext.didChangeActiveServerNotification,
+            object: nil
+        )
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -140,9 +188,13 @@ final class GlobalDockerViewController: UIViewController {
         reloadActiveDocker()
     }
 
+    @objc private func didChangeServer() {
+        reloadActiveDocker()
+    }
+
     private func setupTipLabel() {
         tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "请先在【状态】页面添加并配置服务器"
+        tipLabel.text = "暂无活跃服务器\n请在【状态】列表选择目标机器"
         tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -155,27 +207,36 @@ final class GlobalDockerViewController: UIViewController {
     }
 
     private func reloadActiveDocker() {
-        guard let firstServer = ServerStore.shared.servers.first else {
+        ActiveServerContext.shared.refreshIfNeeded()
+        guard let server = ActiveServerContext.shared.activeServer else {
             dockerVC?.view.removeFromSuperview()
             dockerVC?.removeFromParent()
             dockerVC = nil
+            currentServerId = nil
             tipLabel.isHidden = false
+            title = "容器"
+            return
+        }
+
+        if currentServerId == server.id && dockerVC != nil {
             return
         }
 
         tipLabel.isHidden = true
-        title = "容器 - \(firstServer.name)"
+        title = "容器 (\(server.name))"
+        currentServerId = server.id
 
-        if dockerVC == nil {
-            let session = SSHSession(server: firstServer)
-            let d = DockerViewController(session: session)
-            addChild(d)
-            d.view.frame = view.bounds
-            d.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(d.view)
-            d.didMove(toParent: self)
-            self.dockerVC = d
-        }
+        dockerVC?.view.removeFromSuperview()
+        dockerVC?.removeFromParent()
+
+        let session = SSHSession(server: server)
+        let d = DockerViewController(session: session)
+        addChild(d)
+        d.view.frame = view.bounds
+        d.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(d.view)
+        d.didMove(toParent: self)
+        self.dockerVC = d
     }
 }
 
@@ -183,14 +244,22 @@ final class GlobalDockerViewController: UIViewController {
 
 final class GlobalOpsViewController: UIViewController {
 
+    private var currentServerId: UUID?
     private var opsVC: ServerOpsViewController?
     private let tipLabel = UILabel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "更多运维"
+        title = "运维工具"
         view.backgroundColor = .systemGroupedBackground
         setupTipLabel()
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didChangeServer),
+            name: ActiveServerContext.didChangeActiveServerNotification,
+            object: nil
+        )
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -198,9 +267,13 @@ final class GlobalOpsViewController: UIViewController {
         reloadActiveOps()
     }
 
+    @objc private func didChangeServer() {
+        reloadActiveOps()
+    }
+
     private func setupTipLabel() {
         tipLabel.translatesAutoresizingMaskIntoConstraints = false
-        tipLabel.text = "请先在【状态】页面添加并配置服务器"
+        tipLabel.text = "暂无活跃服务器\n请在【状态】列表选择目标机器"
         tipLabel.font = .systemFont(ofSize: 15, weight: .regular)
         tipLabel.textColor = .secondaryLabel
         tipLabel.textAlignment = .center
@@ -213,26 +286,35 @@ final class GlobalOpsViewController: UIViewController {
     }
 
     private func reloadActiveOps() {
-        guard let firstServer = ServerStore.shared.servers.first else {
+        ActiveServerContext.shared.refreshIfNeeded()
+        guard let server = ActiveServerContext.shared.activeServer else {
             opsVC?.view.removeFromSuperview()
             opsVC?.removeFromParent()
             opsVC = nil
+            currentServerId = nil
             tipLabel.isHidden = false
+            title = "运维工具"
+            return
+        }
+
+        if currentServerId == server.id && opsVC != nil {
             return
         }
 
         tipLabel.isHidden = true
-        title = "运维 - \(firstServer.name)"
+        title = "运维 (\(server.name))"
+        currentServerId = server.id
 
-        if opsVC == nil {
-            let session = SSHSession(server: firstServer)
-            let o = ServerOpsViewController(session: session)
-            addChild(o)
-            o.view.frame = view.bounds
-            o.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(o.view)
-            o.didMove(toParent: self)
-            self.opsVC = o
-        }
+        opsVC?.view.removeFromSuperview()
+        opsVC?.removeFromParent()
+
+        let session = SSHSession(server: server)
+        let o = ServerOpsViewController(session: session)
+        addChild(o)
+        o.view.frame = view.bounds
+        o.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        view.addSubview(o.view)
+        o.didMove(toParent: self)
+        self.opsVC = o
     }
 }

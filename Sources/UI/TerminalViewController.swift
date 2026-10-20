@@ -3,6 +3,9 @@ import WebKit
 import NIOCore
 
 /// 原生级终端控制器：内嵌 xterm 引擎 + 顶部浮动液态玻璃辅助按键栏
+///
+/// 遵循 Apple HIG Keyboards 规范：
+/// 监听键盘尺寸事件，动态收缩终端视口与上抬悬浮液态玻璃操作栏，杜绝输入被遮挡！
 final class TerminalViewController: UIViewController, WKScriptMessageHandler {
 
     private let session: SSHSession
@@ -12,6 +15,8 @@ final class TerminalViewController: UIViewController, WKScriptMessageHandler {
     // 功能层：浮动液态玻璃辅助按键栏 (Ctrl, Esc, Tab, 方向键)
     private let accessoryGlassBar = GlassSurface(variant: .regular, cornerRadius: 20)
     private let statusIndicator = UIActivityIndicatorView(style: .medium)
+
+    private var accessoryBottomConstraint: NSLayoutConstraint?
 
     init(session: SSHSession) {
         self.session = session
@@ -27,8 +32,13 @@ final class TerminalViewController: UIViewController, WKScriptMessageHandler {
         view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
         setupWebView()
         setupAccessoryBar()
+        setupKeyboardObservers()
         loadTerminalHTML()
         startShellSession()
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func setupWebView() {
@@ -84,9 +94,12 @@ final class TerminalViewController: UIViewController, WKScriptMessageHandler {
         stack.distribution = .fillEqually
         accessoryGlassBar.addSubview(stack)
 
+        let bottom = accessoryGlassBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+        self.accessoryBottomConstraint = bottom
+
         NSLayoutConstraint.activate([
             accessoryGlassBar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            accessoryGlassBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -12),
+            bottom,
             accessoryGlassBar.widthAnchor.constraint(equalToConstant: 320),
             accessoryGlassBar.heightAnchor.constraint(equalToConstant: 40),
 
@@ -95,6 +108,34 @@ final class TerminalViewController: UIViewController, WKScriptMessageHandler {
             stack.trailingAnchor.constraint(equalTo: accessoryGlassBar.trailingAnchor, constant: -8),
             stack.bottomAnchor.constraint(equalTo: accessoryGlassBar.bottomAnchor),
         ])
+    }
+
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillChangeFrame(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+    }
+
+    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let endFrame = (userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+              let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue else {
+            return
+        }
+
+        let viewFrame = view.convert(view.bounds, to: nil)
+        let intersection = viewFrame.intersection(endFrame)
+        let keyboardHeight = intersection.height
+
+        let targetOffset = keyboardHeight > 0 ? -(keyboardHeight - view.safeAreaInsets.bottom + 8) : -12
+
+        accessoryBottomConstraint?.constant = targetOffset
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded()
+        }
     }
 
     @objc private func didTapAccessoryKey(_ sender: UIButton) {
