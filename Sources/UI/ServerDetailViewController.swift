@@ -29,6 +29,12 @@ final class ServerDetailViewController: UIViewController {
         self.server = server
         self.session = SSHSession(server: server)
         super.init(nibName: nil, bundle: nil)
+        // 关键性能与体验修复：必须在构造器内立刻锁定标题与大标题模式！
+        // 绝不能拖到 viewDidLoad，否则在 push 转场的瞬间 navigationItem.title 为 nil，
+        // 导致 UIKit 必须等待页面完全推入并折叠重布局后才突兀淡入标题文字。
+        self.title = server.name
+        self.navigationItem.title = server.name
+        self.navigationItem.largeTitleDisplayMode = .never
     }
 
     required init?(coder: NSCoder) {
@@ -37,10 +43,8 @@ final class ServerDetailViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = server.name
         view.backgroundColor = .systemGroupedBackground
 
-        setupNavigationBar()
         setupSegmentedControl()
         setupContainerView()
 
@@ -49,7 +53,7 @@ final class ServerDetailViewController: UIViewController {
     }
 
     private func setupNavigationBar() {
-        navigationItem.largeTitleDisplayMode = .never
+        // 已在 init 早期锁定
     }
 
     private func setupSegmentedControl() {

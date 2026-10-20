@@ -127,6 +127,8 @@ extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let s = servers[indexPath.row]
+        // 优化返回按键文字，避免挤占导航栏导致转场计算延时
+        navigationItem.backButtonTitle = ""
         let detail = ServerDetailViewController(server: s)
         navigationController?.pushViewController(detail, animated: true)
     }
