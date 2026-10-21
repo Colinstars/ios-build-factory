@@ -1,20 +1,24 @@
 import UIKit
 import WebKit
+import NIOCore
 
-/// 专业级全屏 xterm.js 终端控制器 (全面对标 WebSSH 与 Blink Shell 生产级架构)
+/// 工业级移动端全屏真 PTY 交互终端 (100% 对标 iTerm / Blink Shell / Termius 生产级体验)
 ///
-/// 架构特性：
-/// 1. 采用工业级官方 xterm.js + fit-addon 渲染内核，支持真实的 ANSI 256/16色高亮、光标控制、全屏 TUI (htop/vim)；
-/// 2. 原生挂载 `TerminalAccessoryView` (UIInputView)：[ ESC ] [ TAB ] [ CTRL-C ] [ 方向键 ] 随软键盘原生贴合浮动，带触感微振动；
-/// 3. 顶部导航栏配备主机状态徽标与原生清屏按钮；
-/// 4. 彻底抛弃简陋的 UITextView / 聊天输入框，回归真正的极客 SSH 体验。
+/// 架构彻底翻正：
+/// 1. 彻底淘汰伪造的只读命令行执行，建立真实全双工 PTY 双向字节流管道！
+/// 2. 远端 Linux 原生 Bash / Zsh 交互提示符 (root@host:~#) 实时动态下发；
+/// 3. 支持真正的单键交互：按一次 Tab 自动补全、按 Ctrl+C 瞬间中断、支持全屏重绘 (htop / top / vim / nano)；
+/// 4. 键盘上方原生挂载 `TerminalAccessoryView` (ESC, TAB, CTRL, 方向键)，带物理级触感振动；
+/// 5. 采用官方 xterm.js + Tokyo Night 高对比度极客配色，沉浸式满屏排版。
 final class HostTerminalViewController: UIViewController, WKScriptMessageHandler {
 
     private let server: Server
     private var webView: WKWebView!
     private let accessoryBar = TerminalAccessoryView()
     private let statusPill = UILabel()
+
     private var session: SSHSession?
+    private var ptyRelay: SSHPtyStreamRelay?
 
     init(server: Server) {
         self.server = server
@@ -34,12 +38,12 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         setupNavigationStatus()
         setupWebView()
         loadXterm()
-        startSSHSession()
+        startInteractivePtySession()
     }
 
     private func setupNavigationStatus() {
         statusPill.translatesAutoresizingMaskIntoConstraints = false
-        statusPill.text = " SSH 22 "
+        statusPill.text = " PTY 22 "
         statusPill.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
         statusPill.textColor = .systemGreen
         statusPill.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.15)
@@ -79,13 +83,12 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
     private func loadXterm() {
         if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "xterm") {
             webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
-        } else if let fallback = Bundle.main.url(forResource: "xterm", withExtension: "html") {
-            webView.loadFileURL(fallback, allowingReadAccessTo: fallback.deletingLastPathComponent())
         }
     }
 
-    private func startSSHSession() {
-        appendOutput("Connecting to \(server.username)@\(server.host):\(server.port)...\r\n")
+    /// 核心架构：启动真正的远程 Linux PTY 会话
+    private func startInteractivePtySession() {
+        appendOutput("Connecting to \(server.username)@\(server.host):\(server.port) via PTY...\r\n")
 
         let sess = SSHSession(server: server)
         self.session = sess
@@ -93,14 +96,20 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                _ = try await sess.fetchMetrics()
+                // 开启真正的双向 PTY 管道
+                let relay = try await sess.startInteractivePty(cols: 80, rows: 24) { [weak self] buffer in
+                    var buf = buffer
+                    if let text = buf.readString(length: buf.readableBytes) {
+                        self?.appendOutput(text)
+                    }
+                }
+
                 await MainActor.run {
-                    self.appendOutput("\u{1b}[32m[OK] SSH Session Initialized.\u{1b}[0m\r\n")
-                    self.appendOutput("Linux \(self.server.name) (Debian GNU/Linux 13)\r\n\r\n$ ")
+                    self.ptyRelay = relay
                 }
             } catch {
                 await MainActor.run {
-                    self.appendOutput("\u{1b}[31m[ERROR] Connection failed: \(error.localizedDescription)\u{1b}[0m\r\n$ ")
+                    self.appendOutput("\r\n\u{1b}[31m[PTY Error: \(error.localizedDescription)]\u{1b}[0m\r\n")
                 }
             }
         }
@@ -113,59 +122,27 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         }
     }
 
-    private func sendCommand(_ cmd: String) {
-        appendOutput("\(cmd)\r\n")
-
-        Task { [weak self] in
-            guard let self = self, let sess = self.session else { return }
-            do {
-                let out = try await sess.executeCustomCommand(cmd)
-                await MainActor.run {
-                    self.appendOutput("\(out)\r\n$ ")
-                }
-            } catch {
-                await MainActor.run {
-                    self.appendOutput("sh: \(error.localizedDescription)\r\n$ ")
-                }
-            }
-        }
-    }
-
     @objc private func didTapClear() {
         webView.evaluateJavaScript("window.clearTerminal()")
     }
 
-    // MARK: - WKScriptMessageHandler
+    // MARK: - WKScriptMessageHandler (真正的键盘按键全双工直通)
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "terminalInput",
            let dict = message.body as? [String: Any],
            let data = dict["data"] as? String {
-            if data == "\r" || data == "\n" {
-                // 回车执行当前缓冲或发空行
-                appendOutput("\r\n$ ")
-            } else {
-                appendOutput(data)
-            }
+            // 用户在终端敲击的任何字符（包含字母、退格、回车、方向键、Tab），直接通过 stdin 灌入远程 Linux 管道！
+            ptyRelay?.writeString(data)
         }
     }
 }
 
-// MARK: - TerminalAccessoryViewDelegate
+// MARK: - TerminalAccessoryViewDelegate (辅助键盘条直通 PTY)
 
 extension HostTerminalViewController: TerminalAccessoryViewDelegate {
     func terminalAccessoryView(_ view: TerminalAccessoryView, didTapKey key: String) {
-        if key == "\u{03}" { // CTRL-C
-            appendOutput("^C\r\n$ ")
-        } else if key == "clear\r" {
-            webView.evaluateJavaScript("window.clearTerminal()")
-            appendOutput("$ ")
-        } else if key == "\t" { // TAB
-            appendOutput("    ")
-        } else if key.hasPrefix("\u{1b}") { // 方向键/ESC
-            appendOutput(" ")
-        } else {
-            appendOutput(key)
-        }
+        // 修饰键（ESC, TAB, CTRL-C, 方向键等）直接灌入远程 PTY，实时生效！
+        ptyRelay?.writeString(key)
     }
 }

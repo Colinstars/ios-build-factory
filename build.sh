@@ -44,6 +44,10 @@ echo "==> 确保所有 AppIcon PNG 资产物理存在于 .app 根目录下 (inst
 cp -f Resources/AppIcon*.png "$APP_PATH/" || true
 ls -la "$APP_PATH"/AppIcon*.png || true
 
+echo "==> 确保 xterm 完整前端静态引擎存在于 .app 包内"
+cp -Rf Resources/xterm "$APP_PATH/" || true
+ls -la "$APP_PATH/xterm/" || true
+
 echo "==> 校验 Mach-O 部署目标与 SDK"
 otool -l "$APP_PATH/${APP_NAME}" | grep -A5 LC_BUILD_VERSION || true
 
