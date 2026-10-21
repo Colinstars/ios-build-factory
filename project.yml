@@ -18,6 +18,9 @@ packages:
   Citadel:
     url: https://github.com/orlandos-nl/Citadel
     exactVersion: 0.12.1
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    from: 1.18.0
 
 targets:
   ServerLens:
@@ -29,6 +32,7 @@ targets:
       - path: Resources
     dependencies:
       - package: Citadel
+      - package: SwiftTerm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.colinstars.serverlens

@@ -17,7 +17,7 @@ xcodegen --version
 echo "==> 生成工程"
 xcodegen generate
 
-echo "==> 解析 SPM 依赖（Citadel）"
+echo "==> 解析 SPM 依赖（Citadel + SwiftTerm）"
 xcodebuild -resolvePackageDependencies \
   -project "${APP_NAME}.xcodeproj" \
   -scheme "${APP_NAME}" \
