@@ -47,8 +47,8 @@ extension SSHSession {
         let ptyRequest = SSHChannelRequestEvent.PseudoTerminalRequest(
             wantReply: true,
             term: "xterm-256color",
-            terminalCharacterWidth: UInt32(cols),
-            terminalRowHeight: UInt32(rows),
+            terminalCharacterWidth: cols,
+            terminalRowHeight: rows,
             terminalPixelWidth: 0,
             terminalPixelHeight: 0,
             terminalModes: .init([:])
