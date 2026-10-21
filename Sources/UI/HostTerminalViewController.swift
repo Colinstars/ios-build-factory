@@ -20,8 +20,9 @@ final class HostTerminalViewController: UIViewController {
     private var currentCols: Int = 80
     private var currentRows: Int = 24
 
-    init(server: Server) {
+    init(server: Server, preconnectedSession: SSHSession? = nil) {
         self.server = server
+        self.session = preconnectedSession
         super.init(nibName: nil, bundle: nil)
         self.hidesBottomBarWhenPushed = true
     }
@@ -89,9 +90,7 @@ final class HostTerminalViewController: UIViewController {
 
     /// 启动远程 Linux PTY 会话
     private func startInteractivePtySession() {
-        terminalView.feed(text: "Connecting to \(server.username)@\(server.host):\(server.port) via native PTY...\r\n")
-
-        let sess = SSHSession(server: server)
+        let sess = self.session ?? SSHSession(server: server)
         self.session = sess
 
         let initialCols = max(20, currentCols)

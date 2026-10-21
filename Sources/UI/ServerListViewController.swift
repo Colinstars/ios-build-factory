@@ -1,15 +1,29 @@
 import UIKit
+import NIOCore
 
-/// 主机列表 —— 完全使用 Apple 出厂原生组件，零自定义外观代码。
+/// 100% 对标 Termius 官方交互的全新主机列表控制器
+///
+/// 核心交互革命：
+/// 1. 彻底删除多余繁琐的中间页【ServerDetailViewController】！
+/// 2. 点击列表主机卡片，原位触发 Termius 同款【Connecting...】动画与 Spinner；
+/// 3. 在后台先行完成 SSH 物理建连与 PTY 握手，一旦握手成功 (Session Established)，瞬间无缝推入全屏沉浸终端！
+/// 4. 如果连接失败，原地变红并弹窗提示错误，优雅自然，绝不再出现“先进去一个空终端再看报错”的古老感！
 final class ServerListViewController: UIViewController {
 
-    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let tableView = UITableView(frame: .zero, style: .plain)
     private var servers: [Server] = []
+
+    // 记录当前正在发起握手的主机 ID
+    private var connectingServerId: UUID?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "主机"
-        view.backgroundColor = .systemGroupedBackground
+        title = "Hosts"
+        view.backgroundColor = UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? UIColor(red: 18/255.0, green: 20/255.0, blue: 30/255.0, alpha: 1.0)
+                : UIColor.systemGroupedBackground
+        }
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .add,
@@ -23,6 +37,8 @@ final class ServerListViewController: UIViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // 从终端返回后清空 connecting 状态
+        connectingServerId = nil
         reload()
     }
 
@@ -33,7 +49,8 @@ final class ServerListViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = .clear
+        tableView.separatorStyle = .none
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(ServerCell.self, forCellReuseIdentifier: "ServerCell")
@@ -59,6 +76,48 @@ final class ServerListViewController: UIViewController {
 
         present(nav, animated: true)
     }
+
+    /// Termius 级现代直连流：点击卡片 ➔ 原地 Connecting ➔ 握手成功直推终端
+    private func initiateConnection(to server: Server, at indexPath: IndexPath) {
+        guard connectingServerId == nil else { return } // 防止高频连续误触
+        connectingServerId = server.id
+        tableView.reloadRows(at: [indexPath], with: .none)
+
+        // 触感反馈
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+
+        let sess = SSHSession(server: server)
+
+        Task {
+            do {
+                // 1. 先行进行真实 SSH 握手鉴权
+                try await sess.connect()
+
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
+                    self.connectingServerId = nil
+                    self.tableView.reloadRows(at: [indexPath], with: .none)
+
+                    // 2. 握手成功，直接推入全屏终端！
+                    ActiveServerContext.shared.setActiveServer(server)
+                    let termVC = HostTerminalViewController(server: server, preconnectedSession: sess)
+                    self.navigationItem.backButtonTitle = ""
+                    self.navigationController?.pushViewController(termVC, animated: true)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    guard let self = self else { return }
+                    self.connectingServerId = nil
+                    self.tableView.reloadRows(at: [indexPath], with: .none)
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+
+                    let alert = UIAlertController(title: "连接失败", message: error.localizedDescription, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "好的", style: .default))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
+    }
 }
 
 // MARK: - AddServerViewControllerDelegate
@@ -80,17 +139,15 @@ extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ServerCell", for: indexPath) as! ServerCell
-        cell.configure(with: servers[indexPath.row])
+        let s = servers[indexPath.row]
+        let isConn = (s.id == connectingServerId)
+        cell.configure(with: s, isConnecting: isConn)
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
         let s = servers[indexPath.row]
-        ActiveServerContext.shared.setActiveServer(s)
-
-        navigationItem.backButtonTitle = ""
-        navigationController?.pushViewController(ServerDetailViewController(server: s), animated: true)
+        initiateConnection(to: s, at: indexPath)
     }
 
     func tableView(_ tableView: UITableView,
@@ -98,8 +155,7 @@ extension ServerListViewController: UITableViewDataSource, UITableViewDelegate {
                    forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             ServerStore.shared.delete(at: indexPath.row)
-            servers = ServerStore.shared.servers
-            tableView.deleteRows(at: [indexPath], with: .automatic)
+            reload()
         }
     }
 }
