@@ -1,7 +1,7 @@
 import UIKit
 import NIOCore
 
-/// 主机列表视图控制器
+/// 主机列表视图控制器 (支持原生高质感弹性交互与无缝全屏平滑推入)
 final class ServerListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .plain)
@@ -82,13 +82,14 @@ final class ServerListViewController: UIViewController {
         present(nav, animated: true)
     }
 
-    /// 发起连接并在握手时动态探测操作系统发行版
+    /// 发起连接并在握手时动态探测操作系统发行版，成功后无缝灵动推入终端
     private func initiateConnection(to server: Server, at indexPath: IndexPath) {
         guard connectingServerId == nil else { return }
         connectingServerId = server.id
         tableView.reloadRows(at: [indexPath], with: .none)
 
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        // 细腻物理触感反馈
+        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
 
         let sess = SSHSession(server: server)
 
@@ -109,13 +110,24 @@ final class ServerListViewController: UIViewController {
                     self.connectingServerId = nil
                     self.tableView.reloadRows(at: [indexPath], with: .none)
 
+                    // 成功触感提示
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+
                     ActiveServerContext.shared.setActiveServer(server)
                     let termVC = HostTerminalViewController(server: server, preconnectedSession: sess)
                     termVC.onSessionDisconnected = { [weak self] s, err in
                         self?.showDisconnectionDiagnosticSheet(for: s, error: err)
                     }
                     self.navigationItem.backButtonTitle = ""
-                    self.navigationController?.pushViewController(termVC, animated: true)
+
+                    // 灵动平滑转场推入
+                    let transition = CATransition()
+                    transition.duration = 0.32
+                    transition.type = .push
+                    transition.subtype = .fromRight
+                    transition.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                    self.navigationController?.view.layer.add(transition, forKey: kCATransition)
+                    self.navigationController?.pushViewController(termVC, animated: false)
                 }
             } catch {
                 await MainActor.run { [weak self] in

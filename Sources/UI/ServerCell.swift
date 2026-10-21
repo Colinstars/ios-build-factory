@@ -1,6 +1,6 @@
 import UIKit
 
-/// 主机列表项卡片组件 (遵循 Apple HIG 规范，支持多系统自适应徽章展示)
+/// 主机列表项卡片组件 (支持弹性点击动画、自适应发行版徽章)
 final class ServerCell: UITableViewCell {
 
     private let cardContainer = UIView()
@@ -31,7 +31,7 @@ final class ServerCell: UITableViewCell {
         cardContainer.clipsToBounds = true
         contentView.addSubview(cardContainer)
 
-        // 精致紧凑图标底座 (36x36 黄金比例)
+        // 精致紧凑图标底座 36x36
         iconBadge.translatesAutoresizingMaskIntoConstraints = false
         iconBadge.layer.cornerRadius = 9
         iconBadge.layer.cornerCurve = .continuous
@@ -93,10 +93,19 @@ final class ServerCell: UITableViewCell {
         ])
     }
 
+    /// 原生轻量按压弹性缩放动效 (Spring Press Effect)
+    override func setHighlighted(_ highlighted: Bool, animated: Bool) {
+        super.setHighlighted(highlighted, animated: animated)
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction, .beginFromCurrentState]) {
+            self.cardContainer.transform = highlighted ? CGAffineTransform(scaleX: 0.97, y: 0.97) : .identity
+            self.cardContainer.backgroundColor = highlighted ? AppTheme.cardBackground.withAlphaComponent(0.7) : AppTheme.cardBackground
+        }
+    }
+
     func configure(with server: Server, isConnecting: Bool = false) {
         titleLabel.text = server.name
 
-        // 核心：调用 OSBadgeTheme 注册表动态匹配系统发行版图标与色彩体系，绝无写死
+        // 调用 OSBadgeTheme 动态识别系统图标与色彩
         let theme = OSBadgeTheme.resolve(for: server.osType, serverName: server.name)
         iconBadge.backgroundColor = theme.badgeColor
 
@@ -114,7 +123,6 @@ final class ServerCell: UITableViewCell {
             subtitleLabel.textColor = AppTheme.accent
             spinner.startAnimating()
         } else {
-            // 元数据按规范排版：ssh, 用户名, 系统类型, 地区
             var metas: [String] = ["ssh", server.username]
             if let os = server.osType, !os.isEmpty {
                 metas.append(os.lowercased())

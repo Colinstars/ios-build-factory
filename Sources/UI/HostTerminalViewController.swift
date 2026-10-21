@@ -68,7 +68,7 @@ final class HostTerminalViewController: UIViewController {
         view.addSubview(terminalView)
 
         NSLayoutConstraint.activate([
-            terminalView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            terminalView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
             terminalView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             terminalView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             terminalView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
