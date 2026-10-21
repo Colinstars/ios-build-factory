@@ -166,7 +166,7 @@ final class HostTerminalViewController: UIViewController {
     private func didTapMenuAction() {
         let alert = UIAlertController(title: server.name, message: "\(server.host):\(server.port)", preferredStyle: .actionSheet)
         alert.addAction(UIAlertAction(title: "清空终端 (Clear)", style: .default, handler: { [weak self] _ in
-            self?.terminalView.clear()
+            self?.terminalView.feed(text: "\u{1b}[2J\u{1b}[H")
         }))
         alert.addAction(UIAlertAction(title: "重新连接 (Reconnect)", style: .default, handler: { [weak self] _ in
             self?.startInteractivePtySession()
