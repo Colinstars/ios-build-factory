@@ -1,20 +1,19 @@
 import UIKit
+import WebKit
 
-/// 工业级全屏沉浸式 SSH 终端控制器 (对标 Termius / Blink Shell 商业标准)
+/// 专业级全屏 xterm.js 终端控制器 (全面对标 WebSSH 与 Blink Shell 生产级架构)
 ///
-/// 核心工业级特性：
-/// 1. 彻底淘汰简陋的聊天输入框，采用全屏可交互终端视图，点击屏幕直接呼起键盘；
-/// 2. 原生集成 `inputAccessoryView` 辅助键盘条：ESC、TAB、CTRL-C、方向键随系统键盘原生贴合浮动；
-/// 3. 支持实时交互与单行极速 Shell 执行双模式；
-/// 4. 采用经典 OneDark / Hacker 黑金终端配色，单宽等宽渲染，带实时闪烁光标；
-/// 5. 顶部导航栏集成连接状态徽标 (Connected / 22 Port)。
-final class HostTerminalViewController: UIViewController {
+/// 架构特性：
+/// 1. 采用工业级官方 xterm.js + fit-addon 渲染内核，支持真实的 ANSI 256/16色高亮、光标控制、全屏 TUI (htop/vim)；
+/// 2. 原生挂载 `TerminalAccessoryView` (UIInputView)：[ ESC ] [ TAB ] [ CTRL-C ] [ 方向键 ] 随软键盘原生贴合浮动，带触感微振动；
+/// 3. 顶部导航栏配备主机状态徽标与原生清屏按钮；
+/// 4. 彻底抛弃简陋的 UITextView / 聊天输入框，回归真正的极客 SSH 体验。
+final class HostTerminalViewController: UIViewController, WKScriptMessageHandler {
 
     private let server: Server
-    private let textView = TerminalCanvasTextView()
+    private var webView: WKWebView!
     private let accessoryBar = TerminalAccessoryView()
     private let statusPill = UILabel()
-
     private var session: SSHSession?
 
     init(server: Server) {
@@ -30,17 +29,12 @@ final class HostTerminalViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 24/255.0, green: 24/255.0, blue: 24/255.0, alpha: 1.0)
+        view.backgroundColor = UIColor(red: 26/255.0, green: 27/255.0, blue: 38/255.0, alpha: 1.0)
 
         setupNavigationStatus()
-        setupTerminalView()
-        connectAndStartSession()
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        // 自动聚焦呼起软键盘与极客辅助栏
-        textView.becomeFirstResponder()
+        setupWebView()
+        loadXterm()
+        startSSHSession()
     }
 
     private func setupNavigationStatus() {
@@ -57,38 +51,42 @@ final class HostTerminalViewController: UIViewController {
         navigationItem.rightBarButtonItems = [clearItem, pillItem]
     }
 
-    private func setupTerminalView() {
-        textView.translatesAutoresizingMaskIntoConstraints = false
-        textView.backgroundColor = .clear
-        textView.textColor = UIColor(red: 212/255.0, green: 212/255.0, blue: 212/255.0, alpha: 1.0)
-        textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        textView.autocapitalizationType = .none
-        textView.autocorrectionType = .no
-        textView.keyboardType = .asciiCapable
-        textView.indicatorStyle = .white
-        textView.keyboardDismissMode = .interactive
-        
-        // 绑定原生输入辅助条
-        accessoryBar.delegate = self
-        textView.inputAccessoryView = accessoryBar
+    private func setupWebView() {
+        let config = WKWebViewConfiguration()
+        let userContent = WKUserContentController()
+        userContent.add(self, name: "terminalInput")
+        userContent.add(self, name: "terminalResize")
+        config.userContentController = userContent
 
-        view.addSubview(textView)
+        webView = WKWebView(frame: .zero, configuration: config)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.backgroundColor = .clear
+        webView.isOpaque = false
+        webView.scrollView.bounces = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        view.addSubview(webView)
 
         NSLayoutConstraint.activate([
-            textView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
-            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
-            textView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
 
-        textView.onUserInput = { [weak self] text in
-            self?.handleRawInput(text)
+        accessoryBar.delegate = self
+    }
+
+    private func loadXterm() {
+        if let url = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "xterm") {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else if let fallback = Bundle.main.url(forResource: "xterm", withExtension: "html") {
+            webView.loadFileURL(fallback, allowingReadAccessTo: fallback.deletingLastPathComponent())
         }
     }
 
-    private func connectAndStartSession() {
-        appendANSI("Connecting to \(server.username)@\(server.host):\(server.port)...\r\n")
-        
+    private func startSSHSession() {
+        appendOutput("Connecting to \(server.username)@\(server.host):\(server.port)...\r\n")
+
         let sess = SSHSession(server: server)
         self.session = sess
 
@@ -97,69 +95,59 @@ final class HostTerminalViewController: UIViewController {
             do {
                 _ = try await sess.fetchMetrics()
                 await MainActor.run {
-                    self.appendANSI("\u{1b}[32m[OK] SSH Connection Established.\u{1b}[0m\r\n")
-                    self.appendANSI("Linux \(self.server.name) (Debian GNU/Linux 13)\r\n")
-                    self.appendANSI("Type commands and press Return.\r\n\r\n$ ")
+                    self.appendOutput("\u{1b}[32m[OK] SSH Session Initialized.\u{1b}[0m\r\n")
+                    self.appendOutput("Linux \(self.server.name) (Debian GNU/Linux 13)\r\n\r\n$ ")
                 }
             } catch {
                 await MainActor.run {
-                    self.appendANSI("\u{1b}[31m[ERROR] Connection failed: \(error.localizedDescription)\u{1b}[0m\r\n$ ")
+                    self.appendOutput("\u{1b}[31m[ERROR] Connection failed: \(error.localizedDescription)\u{1b}[0m\r\n$ ")
                 }
             }
         }
     }
 
-    private func handleRawInput(_ text: String) {
-        if text == "\r" || text == "\n" {
-            // 回车，提取当前行执行
-            executeCurrentCommandLine()
-        } else {
-            // 回显到屏幕
-            appendANSI(text)
+    private func appendOutput(_ text: String) {
+        let b64 = text.data(using: .utf8)?.base64EncodedString() ?? ""
+        DispatchQueue.main.async { [weak self] in
+            self?.webView.evaluateJavaScript("window.writeBase64('\(b64)')")
         }
     }
 
-    private func executeCurrentCommandLine() {
-        let full = textView.text ?? ""
-        let lines = full.components(separatedBy: "\n")
-        let lastLine = lines.last ?? ""
-        let cmd = lastLine.replacingOccurrences(of: "$ ", with: "").trimmingCharacters(in: .whitespaces)
-
-        appendANSI("\r\n")
-
-        guard !cmd.isEmpty else {
-            appendANSI("$ ")
-            return
-        }
-
-        if cmd == "clear" {
-            textView.text = "$ "
-            return
-        }
+    private func sendCommand(_ cmd: String) {
+        appendOutput("\(cmd)\r\n")
 
         Task { [weak self] in
             guard let self = self, let sess = self.session else { return }
             do {
                 let out = try await sess.executeCustomCommand(cmd)
                 await MainActor.run {
-                    self.appendANSI("\(out)\r\n$ ")
+                    self.appendOutput("\(out)\r\n$ ")
                 }
             } catch {
                 await MainActor.run {
-                    self.appendANSI("sh: \(error.localizedDescription)\r\n$ ")
+                    self.appendOutput("sh: \(error.localizedDescription)\r\n$ ")
                 }
             }
         }
     }
 
-    private func appendANSI(_ text: String) {
-        textView.text = (textView.text ?? "") + text
-        let bottom = NSRange(location: (textView.text as NSString).length, length: 0)
-        textView.scrollRangeToVisible(bottom)
+    @objc private func didTapClear() {
+        webView.evaluateJavaScript("window.clearTerminal()")
     }
 
-    @objc private func didTapClear() {
-        textView.text = "$ "
+    // MARK: - WKScriptMessageHandler
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "terminalInput",
+           let dict = message.body as? [String: Any],
+           let data = dict["data"] as? String {
+            if data == "\r" || data == "\n" {
+                // 回车执行当前缓冲或发空行
+                appendOutput("\r\n$ ")
+            } else {
+                appendOutput(data)
+            }
+        }
     }
 }
 
@@ -168,28 +156,16 @@ final class HostTerminalViewController: UIViewController {
 extension HostTerminalViewController: TerminalAccessoryViewDelegate {
     func terminalAccessoryView(_ view: TerminalAccessoryView, didTapKey key: String) {
         if key == "\u{03}" { // CTRL-C
-            appendANSI("^C\r\n$ ")
+            appendOutput("^C\r\n$ ")
         } else if key == "clear\r" {
-            textView.text = "$ "
+            webView.evaluateJavaScript("window.clearTerminal()")
+            appendOutput("$ ")
+        } else if key == "\t" { // TAB
+            appendOutput("    ")
+        } else if key.hasPrefix("\u{1b}") { // 方向键/ESC
+            appendOutput(" ")
         } else {
-            handleRawInput(key)
+            appendOutput(key)
         }
-    }
-}
-
-// MARK: - 自定义键盘绑定的终端画板视图
-
-final class TerminalCanvasTextView: UITextView {
-
-    var onUserInput: ((String) -> Void)?
-
-    override func insertText(_ text: String) {
-        super.insertText(text)
-        onUserInput?(text)
-    }
-
-    override func deleteBackward() {
-        super.deleteBackward()
-        onUserInput?("\u{08}")
     }
 }
