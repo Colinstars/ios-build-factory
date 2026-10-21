@@ -1,6 +1,6 @@
 import UIKit
 
-/// 100% 对标 Termius 官方真机的断连诊断底部抽屉 (Connection Log Bottom Sheet)
+/// 远程连接断开与诊断面板
 final class ConnectionDiagnosticSheet: UIViewController {
 
     private let server: Server
@@ -56,7 +56,6 @@ final class ConnectionDiagnosticSheet: UIViewController {
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textColor = UIColor(white: 0.85, alpha: 1.0)
 
-        // 生成类似 Termius 官方逐行步骤日志
         var logs = [
             "👤 Starting a new connection to: \"\(server.host)\" port \"\(server.port)\"",
             "⚙️ Starting address resolution of \"\(server.host)\"",

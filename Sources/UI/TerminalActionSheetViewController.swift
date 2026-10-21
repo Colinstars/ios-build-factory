@@ -1,6 +1,6 @@
 import UIKit
 
-/// 100% 对标 Termius 官方四宫格功能菜单抽屉 (Snippets, SFTP, Terminal Settings, Terminal Actions)
+/// 终端快捷操作面板
 final class TerminalActionSheetViewController: UIViewController {
 
     var onClear: (() -> Void)?
@@ -32,7 +32,6 @@ final class TerminalActionSheetViewController: UIViewController {
         containerView.clipsToBounds = true
         view.addSubview(containerView)
 
-        // 顶端拉手
         let grabber = UIView()
         grabber.translatesAutoresizingMaskIntoConstraints = false
         grabber.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
@@ -46,7 +45,6 @@ final class TerminalActionSheetViewController: UIViewController {
         titleLabel.textColor = .white
         containerView.addSubview(titleLabel)
 
-        // 四宫格功能卡片区域 (对齐 Termius 官方四个方块设计)
         let gridStack = UIStackView()
         gridStack.translatesAutoresizingMaskIntoConstraints = false
         gridStack.axis = .horizontal

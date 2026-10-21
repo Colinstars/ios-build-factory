@@ -1,6 +1,6 @@
 import UIKit
 
-/// 应用全局主框架：对标 Termius 官方五大板块 (Hosts / Agent / Files / Containers / Settings)
+/// 底部五大功能分区的主导航控制器 (Hosts / Agent / Files / Containers / Settings)
 final class MainTabBarController: UITabBarController {
 
     override func viewDidLoad() {
@@ -26,7 +26,7 @@ final class MainTabBarController: UITabBarController {
         dockerNav.tabBarItem = UITabBarItem(title: "Containers", image: UIImage(systemName: "shippingbox"), selectedImage: UIImage(systemName: "shippingbox.fill"))
 
         // 5. Settings
-        let opsNav = UINavigationController(rootViewController: GlobalOpsViewController())
+        let opsNav = UINavigationController(rootViewController: ServerOpsViewController())
         opsNav.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gearshape"), selectedImage: UIImage(systemName: "gearshape.fill"))
 
         viewControllers = [hostsNav, agentNav, filesNav, dockerNav, opsNav]

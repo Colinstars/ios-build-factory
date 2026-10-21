@@ -1,11 +1,6 @@
 import UIKit
 
-/// 100% 对标 Termius 官方 Hosts 列表卡片规范的高级精雕主机单元格
-///
-/// 视觉与排版核心重塑：
-/// 1. 【严禁暴露裸 IP】：对标 Termius 原版，第二行只展示 `ssh, root, debian, 洛杉矶`，优雅整洁！
-/// 2. 【缩小第二行字号与图标尺寸】：图标精致收窄至 36x36（不再过大傻憨），第二行字号收拢至 12pt；
-/// 3. 【真实官方 Debian 旋涡矢量图标】：加载官方 Debian Swirl 标志，告别手搓粗糙占位符！
+/// 主机列表项卡片组件 (遵循 Apple HIG 规范，支持多系统自适应徽章展示)
 final class ServerCell: UITableViewCell {
 
     private let cardContainer = UIView()
@@ -36,7 +31,7 @@ final class ServerCell: UITableViewCell {
         cardContainer.clipsToBounds = true
         contentView.addSubview(cardContainer)
 
-        // 精致紧凑图标底座 (36x36，黄金比例，不再过大臃肿)
+        // 精致紧凑图标底座 (36x36 黄金比例)
         iconBadge.translatesAutoresizingMaskIntoConstraints = false
         iconBadge.layer.cornerRadius = 9
         iconBadge.layer.cornerCurve = .continuous
@@ -47,14 +42,14 @@ final class ServerCell: UITableViewCell {
         osIconView.contentMode = .scaleAspectFit
         iconBadge.addSubview(osIconView)
 
-        // 主标题：加粗 16pt，字重优雅
+        // 主标题
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
         titleLabel.textColor = .white
         titleLabel.numberOfLines = 1
         cardContainer.addSubview(titleLabel)
 
-        // 副标题：12pt 浅灰精细体，行高充裕，彻底杜绝切边与遮挡
+        // 副标题：12pt 精细体
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.font = .systemFont(ofSize: 12, weight: .regular)
         subtitleLabel.textColor = UIColor(red: 142/255.0, green: 146/255.0, blue: 168/255.0, alpha: 1.0)
@@ -101,34 +96,17 @@ final class ServerCell: UITableViewCell {
     func configure(with server: Server, isConnecting: Bool = false) {
         titleLabel.text = server.name
 
-        // 智能根据系统类型自动渲染真实 Linux 发行版官方色彩徽章 (对标 Termius)
-        let os = (server.osType ?? "").lowercased()
-        if os.contains("debian") || server.name.lowercased().contains("dmit") || server.name.lowercased().contains("debian") {
-            // Debian 官方标志：Debian 螺旋玫红底座 + 官方白色螺旋 Logo
-            iconBadge.backgroundColor = UIColor(red: 215/255.0, green: 10/255.0, blue: 83/255.0, alpha: 0.95)
-            if let debianImg = UIImage(named: "debian_logo") ?? UIImage(contentsOfFile: Bundle.main.bundlePath + "/debian_logo.png") {
-                osIconView.image = debianImg.withRenderingMode(.alwaysTemplate)
-                osIconView.tintColor = .white
-            } else {
-                let cfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-                osIconView.image = UIImage(systemName: "circle.hexagongrid.circle.fill", withConfiguration: cfg)
-                osIconView.tintColor = .white
-            }
-        } else if os.contains("ubuntu") {
-            iconBadge.backgroundColor = UIColor(red: 233/255.0, green: 84/255.0, blue: 32/255.0, alpha: 0.95)
-            let cfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-            osIconView.image = UIImage(systemName: "circle.circle.fill", withConfiguration: cfg)
-            osIconView.tintColor = .white
-        } else if os.contains("centos") || os.contains("redhat") {
-            iconBadge.backgroundColor = UIColor(red: 147/255.0, green: 34/255.0, blue: 147/255.0, alpha: 0.95)
-            let cfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-            osIconView.image = UIImage(systemName: "cube.fill", withConfiguration: cfg)
+        // 核心：调用 OSBadgeTheme 注册表动态匹配系统发行版图标与色彩体系，绝无写死
+        let theme = OSBadgeTheme.resolve(for: server.osType, serverName: server.name)
+        iconBadge.backgroundColor = theme.badgeColor
+
+        if theme.isCustomAsset, let customImg = UIImage(named: theme.iconName) ?? UIImage(contentsOfFile: Bundle.main.bundlePath + "/\(theme.iconName).png") {
+            osIconView.image = customImg.withRenderingMode(.alwaysTemplate)
             osIconView.tintColor = .white
         } else {
-            iconBadge.backgroundColor = UIColor(red: 45/255.0, green: 50/255.0, blue: 70/255.0, alpha: 0.95)
-            let cfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .bold)
-            osIconView.image = UIImage(systemName: "terminal.fill", withConfiguration: cfg)
-            osIconView.tintColor = AppTheme.accent
+            let cfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+            osIconView.image = UIImage(systemName: theme.iconName, withConfiguration: cfg)
+            osIconView.tintColor = .white
         }
 
         if isConnecting {
@@ -136,12 +114,12 @@ final class ServerCell: UITableViewCell {
             subtitleLabel.textColor = AppTheme.accent
             spinner.startAnimating()
         } else {
-            // 严禁显示生硬 IP！100% 对标 Termius 官方精美信息排版：ssh, root, debian, 地区
+            // 元数据按规范排版：ssh, 用户名, 系统类型, 地区
             var metas: [String] = ["ssh", server.username]
             if let os = server.osType, !os.isEmpty {
                 metas.append(os.lowercased())
             } else {
-                metas.append("debian")
+                metas.append(theme.displayName.lowercased())
             }
             if let reg = server.region, !reg.isEmpty {
                 metas.append(reg)

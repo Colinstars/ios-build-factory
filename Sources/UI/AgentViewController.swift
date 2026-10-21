@@ -8,33 +8,25 @@ struct AgentMessage: Identifiable, Hashable {
     let timestamp: Date = Date()
 }
 
-/// 第二项全局主模块：智能体 (AI Agent)
-///
-/// 遵循 Apple HIG 规范设计的现代化 AI 运维对话体验：
-/// 1. 顶部大标题【智能体】，副标题显示『AI 运维专家 · 就绪』；
-/// 2. 顶部提供 3 个一键提问快捷药丸 (Prompt Chips)；
-/// 3. 对话气泡分层（User 蓝色沉浸气泡，AI 纯白卡片并支持排版）；
-/// 4. 底部悬浮输入条，键盘弹起毫秒级联动，不遮挡内容。
+/// AI 运维助手交互控制器
 final class AgentViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let promptChipsScrollView = UIScrollView()
     private let promptChipsStack = UIStackView()
 
-    // 底部输入栏
     private let inputContainer = UIView()
     private let inputTextField = UITextField()
     private let sendButton = UIButton(type: .system)
     private var inputBottomConstraint: NSLayoutConstraint?
 
-    // 预置专业初始消息
     private var messages: [AgentMessage] = [
-        AgentMessage(isUser: false, text: "你好！我是你的专属 AI 运维智能体。我已经接入当前主机监控管道，你可以向我询问：\n• 当前服务器负载为什么偏高？\n• 排查占用内存最大的进程\n• 检查 Docker 容器健康状况与日志")
+        AgentMessage(isUser: false, text: "你好！我是你的专属 AI 运维助手。我已经接入当前主机监控管道，你可以向我询问：\n• 当前服务器负载为什么偏高？\n• 排查占用内存最大的进程\n• 检查 Docker 容器健康状况与日志")
     ]
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "AI Agent"
+        self.navigationItem.title = "Agent"
         navigationController?.navigationBar.prefersLargeTitles = true
 
         view.backgroundColor = AppTheme.pageBackground
@@ -115,7 +107,7 @@ final class AgentViewController: UIViewController {
         inputContainer.layer.cornerRadius = 24
         inputContainer.layer.cornerCurve = .continuous
         inputContainer.layer.borderWidth = 0.5
-        inputContainer.layer.borderColor = UIColor.separator.cgColor
+        inputContainer.layer.borderColor = AppTheme.separator.cgColor
 
         inputTextField.translatesAutoresizingMaskIntoConstraints = false
         inputTextField.placeholder = "向智能体提问或下发运维指令..."
@@ -127,7 +119,7 @@ final class AgentViewController: UIViewController {
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         let cfg = UIImage.SymbolConfiguration(pointSize: 22, weight: .bold)
         sendButton.setImage(UIImage(systemName: "arrow.up.circle.fill", withConfiguration: cfg), for: .normal)
-        sendButton.tintColor = .systemBlue
+        sendButton.tintColor = AppTheme.accent
         sendButton.addTarget(self, action: #selector(didTapSend), for: .touchUpInside)
 
         inputContainer.addSubview(inputTextField)
@@ -138,11 +130,6 @@ final class AgentViewController: UIViewController {
         self.inputBottomConstraint = bottom
 
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 46),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: inputContainer.topAnchor, constant: -8),
-
             inputContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             inputContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             bottom,
@@ -152,39 +139,38 @@ final class AgentViewController: UIViewController {
             inputTextField.centerYAnchor.constraint(equalTo: inputContainer.centerYAnchor),
             inputTextField.trailingAnchor.constraint(equalTo: sendButton.leadingAnchor, constant: -8),
 
-            sendButton.trailingAnchor.constraint(equalTo: inputContainer.trailingAnchor, constant: -8),
+            sendButton.trailingAnchor.constraint(equalTo: inputContainer.trailingAnchor, constant: -6),
             sendButton.centerYAnchor.constraint(equalTo: inputContainer.centerYAnchor),
-            sendButton.widthAnchor.constraint(equalToConstant: 32),
-            sendButton.heightAnchor.constraint(equalToConstant: 32),
+            sendButton.widthAnchor.constraint(equalToConstant: 36),
+            sendButton.heightAnchor.constraint(equalToConstant: 36),
+
+            tableView.topAnchor.constraint(equalTo: promptChipsScrollView.bottomAnchor, constant: 6),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: inputContainer.topAnchor, constant: -6),
         ])
     }
 
     private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillChangeFrame(_:)),
-            name: UIResponder.keyboardWillChangeFrameNotification,
-            object: nil
-        )
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChangeFrame(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
     }
 
-    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let endFrame = (userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
-              let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue else {
-            return
-        }
+    @objc private func keyboardWillChangeFrame(_ note: Notification) {
+        guard let userInfo = note.userInfo,
+              let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
+              let curveVal = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
 
-        let viewFrame = view.convert(view.bounds, to: nil)
-        let intersection = viewFrame.intersection(endFrame)
-        let keyboardHeight = intersection.height
+        let screenH = UIScreen.main.bounds.height
+        let isHiding = endFrame.origin.y >= screenH
+        let safeAreaBottom = view.safeAreaInsets.bottom
 
-        let targetOffset = keyboardHeight > 0 ? -(keyboardHeight - view.safeAreaInsets.bottom + 8) : -10
-        inputBottomConstraint?.constant = targetOffset
+        let offset = isHiding ? -10 : -(endFrame.height - safeAreaBottom + 8)
+        inputBottomConstraint?.constant = offset
 
-        UIView.animate(withDuration: duration) {
+        let opts = UIView.AnimationOptions(rawValue: curveVal << 16)
+        UIView.animate(withDuration: duration, delay: 0, options: opts) {
             self.view.layoutIfNeeded()
-            self.scrollToBottom(animated: false)
         }
     }
 
@@ -200,45 +186,63 @@ final class AgentViewController: UIViewController {
     }
 
     private func sendMessage(_ text: String) {
-        messages.append(AgentMessage(isUser: true, text: text))
+        let userMsg = AgentMessage(isUser: true, text: text)
+        messages.append(userMsg)
         tableView.reloadData()
-        scrollToBottom(animated: true)
+        scrollToBottom()
 
-        // 模拟智能体思考并秒级返回专业运维推导
+        UISelectionFeedbackGenerator().selectionChanged()
+
+        // 模拟智能体本地分析并给出专业响应
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             guard let self = self else { return }
             let replyText = self.generateSmartReply(for: text)
-            self.messages.append(AgentMessage(isUser: false, text: replyText))
+            let aiMsg = AgentMessage(isUser: false, text: replyText)
+            self.messages.append(aiMsg)
             self.tableView.reloadData()
-            self.scrollToBottom(animated: true)
+            self.scrollToBottom()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
     }
 
     private func generateSmartReply(for input: String) -> String {
-        if input.contains("体检") || input.contains("健康") {
-            return "【系统健康巡检报告】\n• CPU 负载: 0.12 / 0.08 / 0.05 (极低负载)\n• 内存健康: 充足，无 Swap 挤压\n• 磁盘根目录: 已使用 28%，空间充裕\n• 僵尸进程: 0 个\n系统状态处于健康巅峰，无需人工干预。"
-        } else if input.contains("负载") || input.contains("慢") {
-            return "【负载深度排查结论】\n当前主机最近 15 分钟平均负载稳定在 0.05 左右，未发现计算峰值。Top 进程中无异常占用死锁。建议继续保持监控。"
-        } else if input.contains("清理") || input.contains("缓存") {
-            return "【智能运维执行建议】\n已准备好清理脚本：`sync; echo 3 > /proc/sys/vm/drop_caches`。\n该操作安全，可随时释放非活动文件页缓存。"
+        let server = ActiveServerContext.shared.activeServer?.name ?? "当前主机"
+
+        if input.contains("巡检") || input.contains("健康") {
+            return "【\(server) 健康巡检完成】\n• 负载正常：1.38 (1m), 1.43 (5m), 1.36 (15m)\n• 内存健康：可用 0.6 GB / 总 1.9 GB (69%)\n• 磁盘充足：可用 1.6 GB / 总 19.6 GB (92%)\n• 运行时长：已平稳运行 6 天 16 小时"
+        } else if input.contains("进程") || input.contains("负载") {
+            return "【高资源占用进程诊断】\n1. mysqld (PID: 1204) — 内存 24.2%, CPU 2.1%\n2. node (PID: 3418) — 内存 15.6%, CPU 1.4%\n3. nginx (PID: 881) — 内存 3.2%, CPU 0.2%\n建议：整体进程运行稳健，未发现失控死循环进程。"
+        } else if input.contains("缓存") || input.contains("清理") {
+            return "【系统缓存建议】\n• PageCache 可回收: 约 180 MB\n• 系统临时文件: /tmp 占用 12 MB\n如需一键释放缓存，可在终端执行：sync; echo 3 > /proc/sys/vm/drop_caches"
+        } else if input.contains("容器") || input.contains("docker") {
+            return "【Docker 容器健康探测】\n• 活跃容器: 3 个运行中 (nginx, redis, postgres)\n• 异常容器: 0 个 (所有主网关及存储服务处于 healthy 状态)"
         } else {
-            return "收到任务指令：『\(input)』\n智能体已解析语义。由于当前处于安全预览模式，自动化执行前将随时为你生成确认凭据。"
+            return "已收到指令：「\(input)」\n智能体已与 \(server) 建立专属守护通道，随时为你提供性能监控与运维排障支持。"
         }
     }
 
-    private func scrollToBottom(animated: Bool) {
+    private func scrollToBottom() {
         guard !messages.isEmpty else { return }
         let ip = IndexPath(row: messages.count - 1, section: 0)
-        tableView.scrollToRow(at: ip, at: .bottom, animated: animated)
+        tableView.scrollToRow(at: ip, at: .bottom, animated: true)
     }
 }
 
-// MARK: - TableView
+// MARK: - UITextFieldDelegate
 
-extension AgentViewController: UITableViewDataSource, UITableViewDelegate, UITextFieldDelegate {
+extension AgentViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        didTapSend()
+        return true
+    }
+}
+
+// MARK: - UITableViewDataSource, UITableViewDelegate
+
+extension AgentViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return messages.count
+        messages.count
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -246,14 +250,9 @@ extension AgentViewController: UITableViewDataSource, UITableViewDelegate, UITex
         cell.configure(with: messages[indexPath.row])
         return cell
     }
-
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        didTapSend()
-        return true
-    }
 }
 
-// MARK: - 对话气泡 Cell
+// MARK: - AgentBubbleCell
 
 final class AgentBubbleCell: UITableViewCell {
 
@@ -276,15 +275,15 @@ final class AgentBubbleCell: UITableViewCell {
 
     private func setupViews() {
         bubbleView.translatesAutoresizingMaskIntoConstraints = false
-        bubbleView.layer.cornerRadius = 16
+        bubbleView.layer.cornerRadius = 18
         bubbleView.layer.cornerCurve = .continuous
+        bubbleView.clipsToBounds = true
+        contentView.addSubview(bubbleView)
 
         contentLabel.translatesAutoresizingMaskIntoConstraints = false
         contentLabel.numberOfLines = 0
         contentLabel.font = .systemFont(ofSize: 15, weight: .regular)
-
         bubbleView.addSubview(contentLabel)
-        contentView.addSubview(bubbleView)
 
         let leading = bubbleView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16)
         let trailing = bubbleView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16)

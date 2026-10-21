@@ -2,14 +2,14 @@ import Foundation
 
 final class ServerStore {
     static let shared = ServerStore()
-    private let key = "serverlens.servers.v5"
+    private let key = "serverlens.servers.v6"
 
     private(set) var servers: [Server] = []
 
     private init() {
         load()
         if servers.isEmpty {
-            // 预置 Termius 规范主机：ssh, root, Debian, 洛杉矶
+            // 默认初始主机（不固化 osType 与 region，由应用在连通和网络请求中动态自适应拉取）
             servers = [
                 Server(
                     name: "DMIT-LAX.PRO",
@@ -17,9 +17,9 @@ final class ServerStore {
                     port: 22,
                     username: "root",
                     authType: .sshKey(keyId: SSHKeyStore.dmitKeyId),
-                    tag: "生产",
-                    osType: "debian",
-                    region: "洛杉矶"
+                    tag: nil,
+                    osType: nil,
+                    region: nil
                 )
             ]
             save()
@@ -31,9 +31,18 @@ final class ServerStore {
         save()
     }
 
-    func updateOS(for id: UUID, os: String) {
-        if let idx = servers.firstIndex(where: { $0.id == id }) {
+    func updateMetadata(for id: UUID, os: String? = nil, region: String? = nil) {
+        guard let idx = servers.firstIndex(where: { $0.id == id }) else { return }
+        var changed = false
+        if let os = os, servers[idx].osType != os {
             servers[idx].osType = os
+            changed = true
+        }
+        if let reg = region, servers[idx].region != reg {
+            servers[idx].region = reg
+            changed = true
+        }
+        if changed {
             save()
         }
     }

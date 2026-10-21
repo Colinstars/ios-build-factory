@@ -1,6 +1,6 @@
 import UIKit
 
-/// 全局运维配置模型 (对标 Termius / ServerCat 设置项)
+/// 全局运维配置模型
 struct OpsSettings: Codable {
     var defaultPort: Int = 22
     var defaultUser: String = "root"
@@ -30,8 +30,7 @@ final class SettingsStore {
     }
 }
 
-/// 底部第 5 项【更多】重塑为真正的【设置与运维中心】(对标 Termius Settings / ServerCat 设置)
-/// 涵盖：SSH 密钥库管理、默认连接偏好、终端显示配置、网络保活心跳、关于与开源说明
+/// 系统全局设置视图控制器
 final class ServerOpsViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .insetGrouped)
@@ -76,10 +75,10 @@ extension ServerOpsViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch section {
-        case 0: return 1 // 密钥管理
-        case 1: return 2 // 连接偏好
-        case 2: return 2 // 终端与会话
-        case 3: return 2 // 关于与数据安全
+        case 0: return 1 // 密钥库
+        case 1: return 2 // 默认端口与用户名
+        case 2: return 2 // 超时与心跳
+        case 3: return 2 // 关于与版本
         default: return 0
         }
     }
@@ -87,81 +86,59 @@ extension ServerOpsViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         switch section {
         case 0: return "安全凭据"
-        case 1: return "SSH 默认偏好"
-        case 2: return "终端与通信通道"
-        case 3: return "关于 ServerLens"
+        case 1: return "SSH 偏好"
+        case 2: return "终端与通信"
+        case 3: return "关于"
         default: return nil
         }
     }
 
-    func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? {
-        if section == 0 {
-            return "支持 Ed25519 与 RSA 工业级密钥。所有私钥均严格隔离保存在 iOS 本地沙盒中，绝不上云。"
-        }
-        return nil
-    }
-
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        let cell = UITableViewCell(style: .value1, reuseIdentifier: "SettingCell")
         cell.backgroundColor = AppTheme.cardBackground
+        cell.textLabel?.textColor = .label
+        cell.detailTextLabel?.textColor = .secondaryLabel
 
-        let s = SettingsStore.shared.settings
-
-        if indexPath.section == 0 {
+        switch (indexPath.section, indexPath.row) {
+        case (0, 0):
             cell.textLabel?.text = "SSH 密钥管理库 (Keychain)"
             let count = SSHKeyStore.shared.keys.count
             cell.detailTextLabel?.text = "\(count) 个密钥"
             cell.accessoryType = .disclosureIndicator
-            cell.imageView?.image = UIImage(systemName: "key.fill")
-            cell.imageView?.tintColor = .systemYellow
-        } else if indexPath.section == 1 {
-            cell.selectionStyle = .none
-            if indexPath.row == 0 {
-                cell.textLabel?.text = "默认端口"
-                cell.detailTextLabel?.text = "\(s.defaultPort)"
-                cell.imageView?.image = UIImage(systemName: "number")
-                cell.imageView?.tintColor = .systemBlue
-            } else {
-                cell.textLabel?.text = "默认用户名"
-                cell.detailTextLabel?.text = s.defaultUser
-                cell.imageView?.image = UIImage(systemName: "person.crop.circle")
-                cell.imageView?.tintColor = .systemGreen
-            }
-        } else if indexPath.section == 2 {
-            cell.selectionStyle = .none
-            if indexPath.row == 0 {
-                cell.textLabel?.text = "连接超时时间"
-                cell.detailTextLabel?.text = "\(s.connectionTimeoutSeconds) 秒"
-                cell.imageView?.image = UIImage(systemName: "timer")
-                cell.imageView?.tintColor = .systemOrange
-            } else {
-                cell.textLabel?.text = "Keep-Alive 保活心跳"
-                cell.detailTextLabel?.text = "\(s.keepAliveIntervalSeconds) 秒"
-                cell.imageView?.image = UIImage(systemName: "waveform.path.ecg")
-                cell.imageView?.tintColor = .systemPurple
-            }
-        } else {
-            cell.selectionStyle = .none
-            if indexPath.row == 0 {
-                cell.textLabel?.text = "版本号"
-                cell.detailTextLabel?.text = "0.5.0 (Build 13)"
-                cell.imageView?.image = UIImage(systemName: "info.circle")
-                cell.imageView?.tintColor = .systemGray
-            } else {
-                cell.textLabel?.text = "数据隐私协议"
-                cell.detailTextLabel?.text = "本地独占存储"
-                cell.imageView?.image = UIImage(systemName: "hand.raised.fill")
-                cell.imageView?.tintColor = .systemGreen
-            }
+        case (1, 0):
+            cell.textLabel?.text = "默认端口"
+            cell.detailTextLabel?.text = "\(SettingsStore.shared.settings.defaultPort)"
+            cell.accessoryType = .none
+        case (1, 1):
+            cell.textLabel?.text = "默认用户名"
+            cell.detailTextLabel?.text = SettingsStore.shared.settings.defaultUser
+            cell.accessoryType = .none
+        case (2, 0):
+            cell.textLabel?.text = "连接超时时间"
+            cell.detailTextLabel?.text = "\(SettingsStore.shared.settings.connectionTimeoutSeconds) 秒"
+            cell.accessoryType = .none
+        case (2, 1):
+            cell.textLabel?.text = "Keep-Alive 心跳保活"
+            cell.detailTextLabel?.text = "\(SettingsStore.shared.settings.keepAliveIntervalSeconds) 秒"
+            cell.accessoryType = .none
+        case (3, 0):
+            cell.textLabel?.text = "应用版本"
+            cell.detailTextLabel?.text = "1.0.0 (Build 38)"
+            cell.accessoryType = .none
+        case (3, 1):
+            cell.textLabel?.text = "本地数据存储"
+            cell.detailTextLabel?.text = "100% 设备本地独占"
+            cell.accessoryType = .none
+        default:
+            break
         }
+
         return cell
     }
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
-
         if indexPath.section == 0 && indexPath.row == 0 {
-            // 打开专门的 SSH 密钥管理页面
             let keysVC = SSHKeysViewController()
             navigationController?.pushViewController(keysVC, animated: true)
         }

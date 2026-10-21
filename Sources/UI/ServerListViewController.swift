@@ -1,19 +1,12 @@
 import UIKit
 import NIOCore
 
-/// 100% 对标 Termius 官方交互的全新主机列表控制器
-///
-/// 核心交互革命：
-/// 1. 彻底删除多余繁琐的中间页【ServerDetailViewController】！
-/// 2. 点击列表主机卡片，原位触发 Termius 同款【Connecting...】动画与 Spinner；
-/// 3. 在后台先行完成 SSH 物理建连与 PTY 握手，一旦握手成功 (Session Established)，瞬间无缝推入全屏沉浸终端！
-/// 4. 如果连接失败，原地变红并弹窗提示错误，优雅自然，绝不再出现“先进去一个空终端再看报错”的古老感！
+/// 主机列表视图控制器
 final class ServerListViewController: UIViewController {
 
     private let tableView = UITableView(frame: .zero, style: .plain)
     private var servers: [Server] = []
 
-    // 记录当前正在发起握手的主机 ID
     private var connectingServerId: UUID?
 
     override func viewDidLoad() {
@@ -29,11 +22,11 @@ final class ServerListViewController: UIViewController {
 
         setupTableView()
         reload()
+        fetchGeoIPForAllServers()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // 从终端返回后清空 connecting 状态
         connectingServerId = nil
         reload()
     }
@@ -41,6 +34,22 @@ final class ServerListViewController: UIViewController {
     private func reload() {
         servers = ServerStore.shared.servers
         tableView.reloadData()
+    }
+
+    /// 后台静默根据 IP 动态拉取地理位置并刷新
+    private func fetchGeoIPForAllServers() {
+        for s in servers {
+            if s.region == nil {
+                Task {
+                    if let region = await GeoIPService.shared.fetchRegion(for: s.host) {
+                        await MainActor.run {
+                            ServerStore.shared.updateMetadata(for: s.id, region: region)
+                            self.reload()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func setupTableView() {
@@ -73,28 +82,33 @@ final class ServerListViewController: UIViewController {
         present(nav, animated: true)
     }
 
-    /// Termius 级现代直连流：点击卡片 ➔ 原地 Connecting ➔ 握手成功直推终端
+    /// 发起连接并在握手时动态探测操作系统发行版
     private func initiateConnection(to server: Server, at indexPath: IndexPath) {
-        guard connectingServerId == nil else { return } // 防止高频连续误触
+        guard connectingServerId == nil else { return }
         connectingServerId = server.id
         tableView.reloadRows(at: [indexPath], with: .none)
 
-        // 触感反馈
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
         let sess = SSHSession(server: server)
 
         Task {
             do {
-                // 1. 先行进行真实 SSH 握手鉴权
                 try await sess.connect()
+
+                // 异步后台探测远程真实发行版并持久化
+                Task {
+                    let os = await sess.detectOS()
+                    await MainActor.run {
+                        ServerStore.shared.updateMetadata(for: server.id, os: os)
+                    }
+                }
 
                 await MainActor.run { [weak self] in
                     guard let self = self else { return }
                     self.connectingServerId = nil
                     self.tableView.reloadRows(at: [indexPath], with: .none)
 
-                    // 2. 握手成功，直接推入全屏终端！
                     ActiveServerContext.shared.setActiveServer(server)
                     let termVC = HostTerminalViewController(server: server, preconnectedSession: sess)
                     termVC.onSessionDisconnected = { [weak self] s, err in
@@ -116,7 +130,6 @@ final class ServerListViewController: UIViewController {
         }
     }
 
-    /// 100% 对齐 Termius 官方真机的断连诊断日志抽屉
     private func showDisconnectionDiagnosticSheet(for server: Server, error: String?) {
         let errList = error != nil ? [error!] : []
         let sheet = ConnectionDiagnosticSheet(server: server, errorLog: errList)
@@ -140,6 +153,7 @@ extension ServerListViewController: AddServerViewControllerDelegate {
     func addServerViewController(_ controller: AddServerViewController, didAdd server: Server) {
         ServerStore.shared.add(server)
         reload()
+        fetchGeoIPForAllServers()
     }
 }
 

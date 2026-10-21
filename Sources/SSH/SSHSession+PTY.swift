@@ -3,7 +3,7 @@ import Citadel
 import NIOCore
 @preconcurrency import NIOSSH
 
-/// 工业级 SSH PTY 全双工终端管道中继器 (支持动态 Window Change 尺寸同步与 ANSI / Raw 输入)
+/// 工业级 SSH PTY 全双工终端管道中继器
 final class SSHPtyStreamRelay: @unchecked Sendable {
 
     private var stdinWriter: TTYStdinWriter?
@@ -15,7 +15,7 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
         self.stdinWriter = writer
     }
 
-    /// 核心优化：直接传递原始字节，杜绝 UTF-8 字符串二次转码导致非标准终端控制序列撕裂
+    /// 传递原始字节，确保控制序列不被二次编码损坏
     func writeBytes(_ bytes: [UInt8]) {
         lock.lock()
         let writer = self.stdinWriter
@@ -28,7 +28,7 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
             do {
                 try await writer.write(buffer)
             } catch {
-                // 静默忽略在管道正常关闭后的残余写失败
+                // 静默处理正常关闭后的写失败
             }
         }
     }
@@ -37,7 +37,7 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
         writeBytes(Array(text.utf8))
     }
 
-    /// 核心修复：当 iOS 屏幕旋转、键盘弹起收起、或 SwiftTerm 字符网格尺寸改变时，向远端 Linux / tmux 发送 SIGWINCH
+    /// 动态窗口尺寸广播 (SIGWINCH)
     func resize(cols: Int, rows: Int, pixelWidth: Int = 0, pixelHeight: Int = 0) {
         lock.lock()
         let writer = self.stdinWriter
@@ -52,7 +52,7 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
 
 extension SSHSession {
 
-    /// 建立真正的 Linux 伪终端 (PTY) 会话，开启双向字节直通管道 (对标 iTerm / Blink Shell / Termius)
+    /// 建立远程 Linux 伪终端 (PTY) 会话，开启双向字节直通管道
     func startInteractivePty(
         cols: Int = 80,
         rows: Int = 24,
@@ -91,11 +91,9 @@ extension SSHSession {
                         }
                     }
                 }
-                // 正常退出 (例如敲了 exit)
                 onTerminate?(nil)
             } catch {
                 let desc = error.localizedDescription
-                // 异常断连或被远端掐断
                 onTerminate?(desc)
             }
         }

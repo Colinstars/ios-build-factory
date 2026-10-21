@@ -47,6 +47,26 @@ actor SSHSession {
         }
     }
 
+    /// 核心能力：快速执行轻量探测命令，自动识别远端 Linux 真实发行版 (如 debian, ubuntu, arch, alpine, centos, fedora, rhel, openwrt 等)
+    func detectOS() async -> String {
+        do {
+            if client == nil { try await connect() }
+            guard let client = self.client else { return "linux" }
+            // 读取 /etc/os-release 中的 ID 字段，或 fallback 到 uname
+            let cmd = "cat /etc/os-release 2>/dev/null | grep -E '^ID=' | head -1 | cut -d= -f2 | tr -d '\"'; uname -s 2>/dev/null"
+            var buf = try await client.executeCommand(cmd)
+            if let output = buf.readString(length: buf.readableBytes) {
+                let lines = output.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+                if let first = lines.first, !first.isEmpty {
+                    return first.lowercased()
+                }
+            }
+        } catch {
+            // 忽略探测失败
+        }
+        return "linux"
+    }
+
     /// 执行合并命令，单次 RTT 取回 loadavg、meminfo、df、uptime、os-release
     func fetchMetrics() async throws -> ServerMetrics {
         if client == nil {

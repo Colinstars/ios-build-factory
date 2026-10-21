@@ -10,17 +10,7 @@ protocol TerminalAccessoryViewDelegate: AnyObject {
     func terminalAccessoryViewDidTapDismissKeyboard(_ view: TerminalAccessoryView)
 }
 
-/// 100% 对标 Termius 官方真机质感的双层终端辅助控制栏 (专业高质感版)
-///
-/// 视觉细节完美复刻：
-/// 1. 【第一层 Session Bar】：
-///    - 左侧圆角方形返回按钮 `<`；
-///    - 中间椭圆胶囊：终端螺旋图元 + 精细服务器名称 + 原生半透明 `xmark.circle.fill`；
-///    - 右侧精致加号 `+` 与四宫格功能按钮 `square.grid.2x2`；
-/// 2. 【第二层 Key Toolbar】：
-///    - 间距、内边距、圆角（continuous 8pt）及深灰微透底色严丝合缝；
-///    - `shift tab`、`?`、`/`、回形针粘贴图标、`esc`、`tab`、`ctrl`、`alt`、`^C`、`键盘收起`；
-///    - 配合轻触式物理微触感震动反馈。
+/// 终端专用输入辅助栏组件
 final class TerminalAccessoryView: UIView {
 
     weak var delegate: TerminalAccessoryViewDelegate?
@@ -59,11 +49,10 @@ final class TerminalAccessoryView: UIView {
         topBorder.backgroundColor = UIColor.white.withAlphaComponent(0.08)
         addSubview(topBorder)
 
-        // 1. 第一层：Session Tab Bar
+        // 第一层：Session 状态标签栏
         topSessionBar.translatesAutoresizingMaskIntoConstraints = false
         addSubview(topSessionBar)
 
-        // 返回按钮
         backButton.translatesAutoresizingMaskIntoConstraints = false
         let backCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         backButton.setImage(UIImage(systemName: "chevron.left", withConfiguration: backCfg), for: .normal)
@@ -78,7 +67,6 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         topSessionBar.addSubview(backButton)
 
-        // 会话药丸胶囊 (Session Pill - 100% 对齐 Termius 原厂质感)
         sessionPill.translatesAutoresizingMaskIntoConstraints = false
         sessionPill.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
         sessionPill.layer.cornerRadius = 16
@@ -111,7 +99,6 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         sessionPill.addSubview(sessionCloseBtn)
 
-        // + 按钮
         addTabButton.translatesAutoresizingMaskIntoConstraints = false
         let addCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         addTabButton.setImage(UIImage(systemName: "plus", withConfiguration: addCfg), for: .normal)
@@ -126,7 +113,6 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         topSessionBar.addSubview(addTabButton)
 
-        // 四宫格菜单按钮 (Termius 核心功能区入口)
         menuButton.translatesAutoresizingMaskIntoConstraints = false
         let gridCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         menuButton.setImage(UIImage(systemName: "square.grid.2x2", withConfiguration: gridCfg), for: .normal)
@@ -141,7 +127,7 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         topSessionBar.addSubview(menuButton)
 
-        // 2. 第二层：Key Toolbar
+        // 第二层：专业物理按键工具栏
         bottomKeyScrollView.translatesAutoresizingMaskIntoConstraints = false
         bottomKeyScrollView.showsHorizontalScrollIndicator = false
         bottomKeyScrollView.showsVerticalScrollIndicator = false
@@ -161,7 +147,6 @@ final class TerminalAccessoryView: UIView {
             topBorder.trailingAnchor.constraint(equalTo: trailingAnchor),
             topBorder.heightAnchor.constraint(equalToConstant: 0.5),
 
-            // Session Bar 严苛像素对齐
             topSessionBar.topAnchor.constraint(equalTo: topAnchor, constant: 5),
             topSessionBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             topSessionBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
@@ -201,7 +186,6 @@ final class TerminalAccessoryView: UIView {
             sessionTitleLabel.trailingAnchor.constraint(equalTo: sessionCloseBtn.leadingAnchor, constant: -6),
             sessionTitleLabel.centerYAnchor.constraint(equalTo: sessionPill.centerYAnchor),
 
-            // Key Toolbar
             bottomKeyScrollView.topAnchor.constraint(equalTo: topSessionBar.bottomAnchor, constant: 4),
             bottomKeyScrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             bottomKeyScrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
@@ -216,7 +200,6 @@ final class TerminalAccessoryView: UIView {
     }
 
     private func setupKeyButtons() {
-        // 对齐 Termius 官方按键排布
         let items: [(title: String, symbol: String?, code: String)] = [
             ("shift tab", nil, "\u{1b}[Z"),
             ("?", nil, "?"),

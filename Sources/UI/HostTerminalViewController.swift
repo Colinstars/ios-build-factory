@@ -1,13 +1,6 @@
 import UIKit
-import SwiftTerm
-import NIOCore
 
-/// 工业级移动端全屏原生真 PTY 交互终端 (对齐 Termius 官方真机 inputAccessoryView 架构)
-///
-/// 核心修复根因：
-/// 1. 【inputAccessoryView 官方标准实现】：彻底抛弃手写 AutoLayout 约束浮动！直接把双层控制条赋值给 `terminalView.inputAccessoryView`。这样当软键盘弹起时，控制条由 iOS 系统窗口层直接贴合在键盘顶部；当键盘收起时，终端 100% 独占整个屏幕直至屏幕最底部（Safe Area Bottom），绝不会悬空截断！
-/// 2. 【tmux 状态栏贴底机制】：终端视口铺满全屏，tmux 的绿色状态栏自然位于视口最后一行（贴合最底部）；
-/// 3. 【自动尺寸动态上报】：键盘弹起时系统挤压视口，SwiftTerm 会实时调用 `sizeChanged` 通知远端重绘；
+/// 移动端全屏真 PTY 交互终端
 final class HostTerminalViewController: UIViewController {
 
     private let server: Server
@@ -45,7 +38,7 @@ final class HostTerminalViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 1.0)
+        view.backgroundColor = AppTheme.pageBackground
 
         setupTerminalView()
         startInteractivePtySession()
@@ -59,22 +52,19 @@ final class HostTerminalViewController: UIViewController {
         terminalView = TerminalView(frame: .zero)
         terminalView.translatesAutoresizingMaskIntoConstraints = false
         terminalView.terminalDelegate = self
-        terminalView.backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 1.0)
+        terminalView.backgroundColor = AppTheme.pageBackground
 
         // 等宽字体：Menlo 12pt
         terminalView.font = UIFont(name: "Menlo-Regular", size: 12) ?? UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
-        terminalView.caretColor = UIColor(red: 122/255.0, green: 162/255.0, blue: 247/255.0, alpha: 1.0)
+        terminalView.caretColor = AppTheme.accent
 
-        // 核心：使用官方标准的 inputAccessoryView 挂载双层控制栏
         accessoryBar = TerminalAccessoryView(serverTitle: server.name)
         accessoryBar.delegate = self
-        // 设置自定义高度为 82
-        accessoryBar.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 82)
+        accessoryBar.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 86)
         terminalView.inputAccessoryView = accessoryBar
 
         view.addSubview(terminalView)
 
-        // 终端铺满整个屏幕，从顶部 Safe Area 一直打到最底部屏幕边缘
         NSLayoutConstraint.activate([
             terminalView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             terminalView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -109,7 +99,6 @@ final class HostTerminalViewController: UIViewController {
                         }
                     }
                 }, onTerminate: { [weak self] errorDesc in
-                    // 100% 对齐 Termius：一旦断连，立刻发出错误触感震动，退出终端回到列表，并弹出诊断抽屉！
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -162,7 +151,7 @@ final class HostTerminalViewController: UIViewController {
     }
 }
 
-// MARK: - TerminalViewDelegate (SwiftTerm 原生事件回调)
+// MARK: - TerminalViewDelegate
 
 extension HostTerminalViewController: TerminalViewDelegate {
 
@@ -206,7 +195,7 @@ extension HostTerminalViewController: TerminalViewDelegate {
     }
 }
 
-// MARK: - TerminalAccessoryViewDelegate (Termius 交互协议实现)
+// MARK: - TerminalAccessoryViewDelegate
 
 extension HostTerminalViewController: TerminalAccessoryViewDelegate {
 
