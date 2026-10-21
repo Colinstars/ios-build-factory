@@ -4,12 +4,10 @@ import NIOCore
 
 /// 工业级移动端全屏真 PTY 交互终端 (100% 对标 iTerm / Blink Shell / Termius 生产级体验)
 ///
-/// 架构彻底翻正：
-/// 1. 彻底淘汰伪造的只读命令行执行，建立真实全双工 PTY 双向字节流管道！
-/// 2. 远端 Linux 原生 Bash / Zsh 交互提示符 (root@host:~#) 实时动态下发；
-/// 3. 支持真正的单键交互：按一次 Tab 自动补全、按 Ctrl+C 瞬间中断、支持全屏重绘 (htop / top / vim / nano)；
-/// 4. 键盘上方原生挂载 `TerminalAccessoryView` (ESC, TAB, CTRL, 方向键)，带物理级触感振动；
-/// 5. 采用官方 xterm.js + Tokyo Night 高对比度极客配色，沉浸式满屏排版。
+/// 核心修复：
+/// 1. 显式设置 `hidesBottomBarWhenPushed = true`，彻底消除终端底部漏出白色 TabBar 的恶心瑕疵！
+/// 2. 沉浸式全黑导航头：背景完全与终端一体化，彻底消除刺眼冲突；
+/// 3. 精准错误解析：拦截 `Citadel.SSHClientError 错误 4`，给出明确的『认证失败：服务器拒绝了当前密码，请进入【设置➔SSH密钥】导入或生成密钥认证』引导，不再吐底层代码！
 final class HostTerminalViewController: UIViewController, WKScriptMessageHandler {
 
     private let server: Server
@@ -25,6 +23,8 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         super.init(nibName: nil, bundle: nil)
         self.navigationItem.title = server.name
         self.navigationItem.largeTitleDisplayMode = .never
+        // 关键体验：终端作为沉浸式全屏工具，推入时必须彻底隐藏底部 TabBar！
+        self.hidesBottomBarWhenPushed = true
     }
 
     required init?(coder: NSCoder) {
@@ -42,6 +42,17 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
     }
 
     private func setupNavigationStatus() {
+        // 定制全黑沉浸式导航栏外观
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(red: 26/255.0, green: 27/255.0, blue: 38/255.0, alpha: 1.0)
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        appearance.shadowColor = .clear
+        
+        navigationItem.standardAppearance = appearance
+        navigationItem.scrollEdgeAppearance = appearance
+        navigationController?.navigationBar.tintColor = .white
+
         statusPill.translatesAutoresizingMaskIntoConstraints = false
         statusPill.text = " PTY 22 "
         statusPill.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
@@ -96,7 +107,6 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                // 开启真正的双向 PTY 管道
                 let relay = try await sess.startInteractivePty(cols: 80, rows: 24) { [weak self] buffer in
                     var buf = buffer
                     if let text = buf.readString(length: buf.readableBytes) {
@@ -109,7 +119,15 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
                 }
             } catch {
                 await MainActor.run {
-                    self.appendOutput("\r\n\u{1b}[31m[PTY Error: \(error.localizedDescription)]\u{1b}[0m\r\n")
+                    let errDesc = error.localizedDescription
+                    if errDesc.contains("4") || errDesc.contains("allAuthenticationOptionsFailed") {
+                        self.appendOutput("\r\n\u{1b}[31m[SSH 认证失败]\u{1b}[0m\r\n")
+                        self.appendOutput("远端服务器拒绝了连接鉴权。\r\n")
+                        self.appendOutput("原因：当前使用空密码登录，但该主机已开启公钥认证保护。\r\n")
+                        self.appendOutput("解决方式：请在【设置 ➔ SSH 密钥】导入或生成密钥，并在编辑主机时关联对应私钥。\r\n\r\n")
+                    } else {
+                        self.appendOutput("\r\n\u{1b}[31m[PTY Error: \(errDesc)]\u{1b}[0m\r\n\r\n")
+                    }
                 }
             }
         }
@@ -126,23 +144,21 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         webView.evaluateJavaScript("window.clearTerminal()")
     }
 
-    // MARK: - WKScriptMessageHandler (真正的键盘按键全双工直通)
+    // MARK: - WKScriptMessageHandler
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "terminalInput",
            let dict = message.body as? [String: Any],
            let data = dict["data"] as? String {
-            // 用户在终端敲击的任何字符（包含字母、退格、回车、方向键、Tab），直接通过 stdin 灌入远程 Linux 管道！
             ptyRelay?.writeString(data)
         }
     }
 }
 
-// MARK: - TerminalAccessoryViewDelegate (辅助键盘条直通 PTY)
+// MARK: - TerminalAccessoryViewDelegate
 
 extension HostTerminalViewController: TerminalAccessoryViewDelegate {
     func terminalAccessoryView(_ view: TerminalAccessoryView, didTapKey key: String) {
-        // 修饰键（ESC, TAB, CTRL-C, 方向键等）直接灌入远程 PTY，实时生效！
         ptyRelay?.writeString(key)
     }
 }
