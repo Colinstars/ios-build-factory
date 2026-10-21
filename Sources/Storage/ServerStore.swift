@@ -2,14 +2,14 @@ import Foundation
 
 final class ServerStore {
     static let shared = ServerStore()
-    private let key = "serverlens.servers.v4"
+    private let key = "serverlens.servers.v5"
 
     private(set) var servers: [Server] = []
 
     private init() {
         load()
         if servers.isEmpty {
-            // 预置已绑定有效 Ed25519 私钥与 Debian 系统标识的真实 DMIT 主机
+            // 预置 Termius 规范主机：ssh, root, Debian, 洛杉矶
             servers = [
                 Server(
                     name: "DMIT-LAX.PRO",
@@ -17,8 +17,9 @@ final class ServerStore {
                     port: 22,
                     username: "root",
                     authType: .sshKey(keyId: SSHKeyStore.dmitKeyId),
-                    tag: "生产 / 洛杉矶",
-                    osType: "debian"
+                    tag: "生产",
+                    osType: "debian",
+                    region: "洛杉矶"
                 )
             ]
             save()

@@ -46,6 +46,7 @@ APP_PATH="$OUT/Build/Products/Release-iphoneos/${APP_NAME}.app"
 
 echo "==> 确保所有 AppIcon PNG 资产物理存在于 .app 根目录下 (installd 最高优先级识别)"
 cp -f Resources/AppIcon*.png "$APP_PATH/" || true
+cp -f Resources/debian_logo.png "$APP_PATH/" || true
 ls -la "$APP_PATH"/AppIcon*.png || true
 
 echo "==> 校验 Mach-O 部署目标与 SDK"
