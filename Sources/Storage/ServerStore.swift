@@ -2,14 +2,14 @@ import Foundation
 
 final class ServerStore {
     static let shared = ServerStore()
-    private let key = "serverlens.servers.v2"
+    private let key = "serverlens.servers.v3"
 
     private(set) var servers: [Server] = []
 
     private init() {
         load()
         if servers.isEmpty {
-            // 预置已绑定 Ed25519 私钥的真实 DMIT 主机，开箱即用 100% 瞬连！
+            // 预置已绑定有效 Ed25519 私钥的真实 DMIT 主机，开箱即用 100% 瞬连！
             servers = [
                 Server(
                     name: "DMIT-LAX.PRO",

@@ -155,7 +155,11 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
             } catch {
                 await MainActor.run {
                     let errDesc = error.localizedDescription
-                    if errDesc.contains("4") || errDesc.contains("allAuthenticationOptionsFailed") {
+                    if case .sshKey = self.server.authType {
+                        self.appendOutput("\r\n\u{1b}[31m[SSH 密钥认证失败]\u{1b}[0m\r\n")
+                        self.appendOutput("远端服务器拒绝了公钥鉴权 (Permission denied: publickey)。\r\n")
+                        self.appendOutput("错误详情: \(errDesc)\r\n\r\n")
+                    } else if errDesc.contains("4") || errDesc.contains("allAuthenticationOptionsFailed") {
                         self.appendOutput("\r\n\u{1b}[31m[SSH 认证失败]\u{1b}[0m\r\n")
                         self.appendOutput("远端服务器拒绝了连接鉴权。\r\n")
                         self.appendOutput("原因：当前主机设置了密码登录，但该主机仅允许私钥认证。\r\n")
