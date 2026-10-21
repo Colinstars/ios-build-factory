@@ -20,6 +20,8 @@ final class HostTerminalViewController: UIViewController {
     private var currentCols: Int = 80
     private var currentRows: Int = 24
 
+    var onSessionDisconnected: ((Server, String?) -> Void)?
+
     init(server: Server, preconnectedSession: SSHSession? = nil) {
         self.server = server
         self.session = preconnectedSession
@@ -99,14 +101,22 @@ final class HostTerminalViewController: UIViewController {
         Task { [weak self] in
             guard let self = self else { return }
             do {
-                let relay = try await sess.startInteractivePty(cols: initialCols, rows: initialRows) { [weak self] buffer in
+                let relay = try await sess.startInteractivePty(cols: initialCols, rows: initialRows, onOutput: { [weak self] buffer in
                     var buf = buffer
                     if let text = buf.readString(length: buf.readableBytes) {
                         DispatchQueue.main.async {
                             self?.terminalView.feed(text: text)
                         }
                     }
-                }
+                }, onTerminate: { [weak self] errorDesc in
+                    // 100% 对齐 Termius：一旦断连，立刻发出错误触感震动，退出终端回到列表，并弹出诊断抽屉！
+                    DispatchQueue.main.async {
+                        guard let self = self else { return }
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        self.navigationController?.popViewController(animated: true)
+                        self.onSessionDisconnected?(self.server, errorDesc)
+                    }
+                })
 
                 await MainActor.run {
                     self.ptyRelay = relay
@@ -129,23 +139,26 @@ final class HostTerminalViewController: UIViewController {
     }
 
     private func didTapMenuAction() {
-        let alert = UIAlertController(title: server.name, message: "\(server.host):\(server.port)", preferredStyle: .actionSheet)
-        alert.addAction(UIAlertAction(title: "清空终端 (Clear)", style: .default, handler: { [weak self] _ in
+        let sheet = TerminalActionSheetViewController()
+        sheet.modalPresentationStyle = .overFullScreen
+        sheet.modalTransitionStyle = .crossDissolve
+
+        sheet.onClear = { [weak self] in
             self?.terminalView.feed(text: "\u{1b}[2J\u{1b}[H")
-        }))
-        alert.addAction(UIAlertAction(title: "强制刷新屏幕 (Redraw)", style: .default, handler: { [weak self] _ in
+        }
+        sheet.onRedraw = { [weak self] in
             guard let self = self else { return }
             self.ptyRelay?.writeString("\u{0c}")
             self.ptyRelay?.resize(cols: self.currentCols, rows: self.currentRows)
-        }))
-        alert.addAction(UIAlertAction(title: "重新连接 (Reconnect)", style: .default, handler: { [weak self] _ in
+        }
+        sheet.onReconnect = { [weak self] in
             self?.startInteractivePtySession()
-        }))
-        alert.addAction(UIAlertAction(title: "断开并退出", style: .destructive, handler: { [weak self] _ in
+        }
+        sheet.onDisconnect = { [weak self] in
             self?.navigationController?.popViewController(animated: true)
-        }))
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        present(alert, animated: true)
+        }
+
+        present(sheet, animated: true)
     }
 }
 

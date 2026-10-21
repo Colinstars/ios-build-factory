@@ -101,6 +101,9 @@ final class ServerListViewController: UIViewController {
                     // 2. 握手成功，直接推入全屏终端！
                     ActiveServerContext.shared.setActiveServer(server)
                     let termVC = HostTerminalViewController(server: server, preconnectedSession: sess)
+                    termVC.onSessionDisconnected = { [weak self] s, err in
+                        self?.showDisconnectionDiagnosticSheet(for: s, error: err)
+                    }
                     self.navigationItem.backButtonTitle = ""
                     self.navigationController?.pushViewController(termVC, animated: true)
                 }
@@ -111,12 +114,27 @@ final class ServerListViewController: UIViewController {
                     self.tableView.reloadRows(at: [indexPath], with: .none)
                     UINotificationFeedbackGenerator().notificationOccurred(.error)
 
-                    let alert = UIAlertController(title: "连接失败", message: error.localizedDescription, preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "好的", style: .default))
-                    self.present(alert, animated: true)
+                    self.showDisconnectionDiagnosticSheet(for: server, error: error.localizedDescription)
                 }
             }
         }
+    }
+
+    /// 100% 对齐 Termius 官方真机的断连诊断日志抽屉
+    private func showDisconnectionDiagnosticSheet(for server: Server, error: String?) {
+        let errList = error != nil ? [error!] : []
+        let sheet = ConnectionDiagnosticSheet(server: server, errorLog: errList)
+        sheet.modalPresentationStyle = .pageSheet
+        if let pc = sheet.sheetPresentationController {
+            pc.detents = [.medium(), .large()]
+            pc.prefersGrabberVisible = true
+        }
+        sheet.onReconnect = { [weak self] in
+            if let idx = self?.servers.firstIndex(where: { $0.id == server.id }) {
+                self?.initiateConnection(to: server, at: IndexPath(row: idx, section: 0))
+            }
+        }
+        present(sheet, animated: true)
     }
 }
 

@@ -10,12 +10,17 @@ protocol TerminalAccessoryViewDelegate: AnyObject {
     func terminalAccessoryViewDidTapDismissKeyboard(_ view: TerminalAccessoryView)
 }
 
-/// 100% 对标 Termius 官方真机布局的双层终端辅助控制栏 (专业运维扩展版)
+/// 100% 对标 Termius 官方真机质感的双层终端辅助控制栏 (专业高质感版)
 ///
-/// 第一层：会话标签栏 (Session Tab Bar)
-///  [ < 返回 ]  [ 🐚 DMIT-LAX  ⓧ ]  [ + ]  [ 田 ]
-///
-/// 第二层：专业物理按键行 (Key Toolbar - 支持方向键、F1~F12、Home/End、PageUp/Down、tmux 快捷操作)
+/// 视觉细节完美复刻：
+/// 1. 【第一层 Session Bar】：
+///    - 左侧圆角方形返回按钮 `<`；
+///    - 中间椭圆胶囊：终端螺旋图元 + 精细服务器名称 + 原生半透明 `xmark.circle.fill`；
+///    - 右侧精致加号 `+` 与四宫格功能按钮 `square.grid.2x2`；
+/// 2. 【第二层 Key Toolbar】：
+///    - 间距、内边距、圆角（continuous 8pt）及深灰微透底色严丝合缝；
+///    - `shift tab`、`?`、`/`、回形针粘贴图标、`esc`、`tab`、`ctrl`、`alt`、`^C`、`键盘收起`；
+///    - 配合轻触式物理微触感震动反馈。
 final class TerminalAccessoryView: UIView {
 
     weak var delegate: TerminalAccessoryViewDelegate?
@@ -37,8 +42,8 @@ final class TerminalAccessoryView: UIView {
     private var ctrlButton: UIButton?
 
     init(serverTitle: String) {
-        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 82))
-        backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 0.98)
+        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 86))
+        backgroundColor = UIColor(red: 24/255.0, green: 26/255.0, blue: 36/255.0, alpha: 0.98)
         setupViews(serverTitle: serverTitle)
     }
 
@@ -49,21 +54,23 @@ final class TerminalAccessoryView: UIView {
     private func setupViews(serverTitle: String) {
         autoresizingMask = [.flexibleWidth, .flexibleHeight]
 
-        let sep = UIView()
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        sep.backgroundColor = UIColor.white.withAlphaComponent(0.08)
-        addSubview(sep)
+        let topBorder = UIView()
+        topBorder.translatesAutoresizingMaskIntoConstraints = false
+        topBorder.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+        addSubview(topBorder)
 
         // 1. 第一层：Session Tab Bar
         topSessionBar.translatesAutoresizingMaskIntoConstraints = false
         addSubview(topSessionBar)
 
+        // 返回按钮
         backButton.translatesAutoresizingMaskIntoConstraints = false
-        let backCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        let backCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         backButton.setImage(UIImage(systemName: "chevron.left", withConfiguration: backCfg), for: .normal)
         backButton.tintColor = UIColor(white: 0.85, alpha: 1.0)
         backButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
         backButton.layer.cornerRadius = 8
+        backButton.layer.cornerCurve = .continuous
         backButton.addAction(UIAction(handler: { [weak self] _ in
             guard let self = self else { return }
             self.feedback.selectionChanged()
@@ -71,14 +78,16 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         topSessionBar.addSubview(backButton)
 
+        // 会话药丸胶囊 (Session Pill - 100% 对齐 Termius 原厂质感)
         sessionPill.translatesAutoresizingMaskIntoConstraints = false
         sessionPill.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
         sessionPill.layer.cornerRadius = 16
+        sessionPill.layer.cornerCurve = .continuous
         sessionPill.clipsToBounds = true
         topSessionBar.addSubview(sessionPill)
 
         sessionIcon.translatesAutoresizingMaskIntoConstraints = false
-        let iconCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        let iconCfg = UIImage.SymbolConfiguration(pointSize: 12, weight: .bold)
         sessionIcon.image = UIImage(systemName: "terminal.fill", withConfiguration: iconCfg)
         sessionIcon.tintColor = UIColor(red: 122/255.0, green: 162/255.0, blue: 247/255.0, alpha: 1.0)
         sessionIcon.contentMode = .scaleAspectFit
@@ -86,7 +95,7 @@ final class TerminalAccessoryView: UIView {
 
         sessionTitleLabel.translatesAutoresizingMaskIntoConstraints = false
         sessionTitleLabel.text = serverTitle
-        sessionTitleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        sessionTitleLabel.font = .monospacedSystemFont(ofSize: 13, weight: .semibold)
         sessionTitleLabel.textColor = .white
         sessionTitleLabel.lineBreakMode = .byTruncatingTail
         sessionPill.addSubview(sessionTitleLabel)
@@ -94,7 +103,7 @@ final class TerminalAccessoryView: UIView {
         sessionCloseBtn.translatesAutoresizingMaskIntoConstraints = false
         let closeCfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
         sessionCloseBtn.setImage(UIImage(systemName: "xmark.circle.fill", withConfiguration: closeCfg), for: .normal)
-        sessionCloseBtn.tintColor = UIColor(white: 0.6, alpha: 1.0)
+        sessionCloseBtn.tintColor = UIColor(white: 0.55, alpha: 1.0)
         sessionCloseBtn.addAction(UIAction(handler: { [weak self] _ in
             guard let self = self else { return }
             self.feedback.selectionChanged()
@@ -102,12 +111,14 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         sessionPill.addSubview(sessionCloseBtn)
 
+        // + 按钮
         addTabButton.translatesAutoresizingMaskIntoConstraints = false
-        let addCfg = UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        let addCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         addTabButton.setImage(UIImage(systemName: "plus", withConfiguration: addCfg), for: .normal)
         addTabButton.tintColor = UIColor(white: 0.85, alpha: 1.0)
         addTabButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
         addTabButton.layer.cornerRadius = 8
+        addTabButton.layer.cornerCurve = .continuous
         addTabButton.addAction(UIAction(handler: { [weak self] _ in
             guard let self = self else { return }
             self.feedback.selectionChanged()
@@ -115,12 +126,14 @@ final class TerminalAccessoryView: UIView {
         }), for: .touchUpInside)
         topSessionBar.addSubview(addTabButton)
 
+        // 四宫格菜单按钮 (Termius 核心功能区入口)
         menuButton.translatesAutoresizingMaskIntoConstraints = false
         let gridCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .semibold)
         menuButton.setImage(UIImage(systemName: "square.grid.2x2", withConfiguration: gridCfg), for: .normal)
         menuButton.tintColor = UIColor(white: 0.85, alpha: 1.0)
         menuButton.backgroundColor = UIColor(white: 1.0, alpha: 0.08)
         menuButton.layer.cornerRadius = 8
+        menuButton.layer.cornerCurve = .continuous
         menuButton.addAction(UIAction(handler: { [weak self] _ in
             guard let self = self else { return }
             self.feedback.selectionChanged()
@@ -143,29 +156,30 @@ final class TerminalAccessoryView: UIView {
         setupKeyButtons()
 
         NSLayoutConstraint.activate([
-            sep.topAnchor.constraint(equalTo: topAnchor),
-            sep.leadingAnchor.constraint(equalTo: leadingAnchor),
-            sep.trailingAnchor.constraint(equalTo: trailingAnchor),
-            sep.heightAnchor.constraint(equalToConstant: 0.5),
+            topBorder.topAnchor.constraint(equalTo: topAnchor),
+            topBorder.leadingAnchor.constraint(equalTo: leadingAnchor),
+            topBorder.trailingAnchor.constraint(equalTo: trailingAnchor),
+            topBorder.heightAnchor.constraint(equalToConstant: 0.5),
 
-            topSessionBar.topAnchor.constraint(equalTo: topAnchor, constant: 4),
+            // Session Bar 严苛像素对齐
+            topSessionBar.topAnchor.constraint(equalTo: topAnchor, constant: 5),
             topSessionBar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             topSessionBar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             topSessionBar.heightAnchor.constraint(equalToConstant: 34),
 
             backButton.leadingAnchor.constraint(equalTo: topSessionBar.leadingAnchor),
             backButton.centerYAnchor.constraint(equalTo: topSessionBar.centerYAnchor),
-            backButton.widthAnchor.constraint(equalToConstant: 36),
+            backButton.widthAnchor.constraint(equalToConstant: 34),
             backButton.heightAnchor.constraint(equalToConstant: 32),
 
             menuButton.trailingAnchor.constraint(equalTo: topSessionBar.trailingAnchor),
             menuButton.centerYAnchor.constraint(equalTo: topSessionBar.centerYAnchor),
-            menuButton.widthAnchor.constraint(equalToConstant: 36),
+            menuButton.widthAnchor.constraint(equalToConstant: 34),
             menuButton.heightAnchor.constraint(equalToConstant: 32),
 
             addTabButton.trailingAnchor.constraint(equalTo: menuButton.leadingAnchor, constant: -8),
             addTabButton.centerYAnchor.constraint(equalTo: topSessionBar.centerYAnchor),
-            addTabButton.widthAnchor.constraint(equalToConstant: 36),
+            addTabButton.widthAnchor.constraint(equalToConstant: 34),
             addTabButton.heightAnchor.constraint(equalToConstant: 32),
 
             sessionPill.leadingAnchor.constraint(equalTo: backButton.trailingAnchor, constant: 8),
@@ -187,10 +201,11 @@ final class TerminalAccessoryView: UIView {
             sessionTitleLabel.trailingAnchor.constraint(equalTo: sessionCloseBtn.leadingAnchor, constant: -6),
             sessionTitleLabel.centerYAnchor.constraint(equalTo: sessionPill.centerYAnchor),
 
+            // Key Toolbar
             bottomKeyScrollView.topAnchor.constraint(equalTo: topSessionBar.bottomAnchor, constant: 4),
             bottomKeyScrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
             bottomKeyScrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            bottomKeyScrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            bottomKeyScrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5),
 
             bottomKeyStack.topAnchor.constraint(equalTo: bottomKeyScrollView.topAnchor),
             bottomKeyStack.leadingAnchor.constraint(equalTo: bottomKeyScrollView.leadingAnchor),
@@ -201,36 +216,29 @@ final class TerminalAccessoryView: UIView {
     }
 
     private func setupKeyButtons() {
-        // 针对 tmux / vim / htop 完整专业按键集排布
+        // 对齐 Termius 官方按键排布
         let items: [(title: String, symbol: String?, code: String)] = [
+            ("shift tab", nil, "\u{1b}[Z"),
+            ("?", nil, "?"),
+            ("/", nil, "/"),
+            ("", "paperclip", "PASTE_CLIPBOARD"),
             ("esc", nil, "\u{1b}"),
             ("tab", nil, "\t"),
             ("ctrl", nil, "TOGGLE_CTRL"),
-            ("^B", nil, "\u{02}"), // tmux 核心 Prefix 键 (Ctrl+B)
+            ("alt", nil, "\u{1b}"),
             ("^C", nil, "\u{03}"),
-            ("^D", nil, "\u{04}"),
-            ("shift tab", nil, "\u{1b}[Z"),
+            ("^B", nil, "\u{02}"),
             ("↑", nil, "\u{1b}[A"),
             ("↓", nil, "\u{1b}[B"),
             ("←", nil, "\u{1b}[D"),
             ("→", nil, "\u{1b}[C"),
-            ("Home", nil, "\u{1b}[H"),
-            ("End", nil, "\u{1b}[F"),
-            ("PgUp", nil, "\u{1b}[5~"),
-            ("PgDn", nil, "\u{1b}[6~"),
-            ("", "paperclip", "PASTE_CLIPBOARD"),
-            ("?", nil, "?"),
-            ("/", nil, "/"),
-            ("-", nil, "-"),
-            ("|", nil, "|"),
-            ("~", nil, "~"),
             ("", "keyboard.chevron.compact.down", "DISMISS_KEYBOARD")
         ]
 
         for item in items {
             let btn = UIButton(type: .system)
             if let sym = item.symbol {
-                let cfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold)
+                let cfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .medium)
                 btn.setImage(UIImage(systemName: sym, withConfiguration: cfg), for: .normal)
             } else {
                 btn.setTitle(item.title, for: .normal)
@@ -239,8 +247,9 @@ final class TerminalAccessoryView: UIView {
 
             btn.setTitleColor(.white, for: .normal)
             btn.tintColor = .white
-            btn.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+            btn.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
             btn.layer.cornerRadius = 6
+            btn.layer.cornerCurve = .continuous
             btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
 
             if item.code == "TOGGLE_CTRL" {
@@ -267,11 +276,11 @@ final class TerminalAccessoryView: UIView {
             isCtrlActive.toggle()
             ctrlButton?.backgroundColor = isCtrlActive
                 ? UIColor.systemBlue
-                : UIColor(white: 1.0, alpha: 0.12)
+                : UIColor(white: 1.0, alpha: 0.10)
         default:
             if isCtrlActive {
                 isCtrlActive = false
-                ctrlButton?.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+                ctrlButton?.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
                 if let firstChar = code.lowercased().first, let ascii = firstChar.asciiValue, ascii >= 97 && ascii <= 122 {
                     let ctrlVal = Character(UnicodeScalar(ascii - 96))
                     delegate?.terminalAccessoryView(self, didSendKey: String(ctrlVal))
@@ -287,6 +296,6 @@ final class TerminalAccessoryView: UIView {
     }
 
     override var intrinsicContentSize: CGSize {
-        return CGSize(width: UIView.noIntrinsicMetric, height: 82)
+        return CGSize(width: UIView.noIntrinsicMetric, height: 86)
     }
 }

@@ -28,7 +28,7 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
             do {
                 try await writer.write(buffer)
             } catch {
-                // 静默忽略在管道正常关闭后的残余写失败，防止抛出错误 6
+                // 静默忽略在管道正常关闭后的残余写失败
             }
         }
     }
@@ -56,7 +56,8 @@ extension SSHSession {
     func startInteractivePty(
         cols: Int = 80,
         rows: Int = 24,
-        onOutput: @escaping @Sendable (ByteBuffer) -> Void
+        onOutput: @escaping @Sendable (ByteBuffer) -> Void,
+        onTerminate: (@Sendable (String?) -> Void)? = nil
     ) async throws -> SSHPtyStreamRelay {
         if !isConnected() {
             try await connect()
@@ -90,14 +91,12 @@ extension SSHSession {
                         }
                     }
                 }
+                // 正常退出 (例如敲了 exit)
+                onTerminate?(nil)
             } catch {
-                // 友好拦截通道正常退出或管道半关闭信号
                 let desc = error.localizedDescription
-                if !desc.contains("ioOnClosedChannel") && !desc.contains("alreadyClosed") && !desc.contains("6") {
-                    var errBuf = ByteBuffer()
-                    errBuf.writeString("\r\n\u{1b}[33m[SSH 会话已关闭: \(desc)]\u{1b}[0m\r\n")
-                    onOutput(errBuf)
-                }
+                // 异常断连或被远端掐断
+                onTerminate?(desc)
             }
         }
 
