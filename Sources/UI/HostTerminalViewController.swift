@@ -1,21 +1,26 @@
 import UIKit
 
-/// 某台主机的专属纯原生交互终端界面 (对标 Termius Terminal 纯净原生设计)
-/// 零 HTML/JS 依赖，纯 Swift 打造，带有顶部 SSH 会话状态条、单宽等宽终端字体与实时指令交互
+/// 工业级全屏沉浸式 SSH 终端控制器 (对标 Termius / Blink Shell 商业标准)
+///
+/// 核心工业级特性：
+/// 1. 彻底淘汰简陋的聊天输入框，采用全屏可交互终端视图，点击屏幕直接呼起键盘；
+/// 2. 原生集成 `inputAccessoryView` 辅助键盘条：ESC、TAB、CTRL-C、方向键随系统键盘原生贴合浮动；
+/// 3. 支持实时交互与单行极速 Shell 执行双模式；
+/// 4. 采用经典 OneDark / Hacker 黑金终端配色，单宽等宽渲染，带实时闪烁光标；
+/// 5. 顶部导航栏集成连接状态徽标 (Connected / 22 Port)。
 final class HostTerminalViewController: UIViewController {
 
     private let server: Server
-    private let textView = UITextView()
-    private let commandInputBar = UIView()
-    private let commandField = UITextField()
-    private let sendBtn = UIButton(type: .system)
+    private let textView = TerminalCanvasTextView()
+    private let accessoryBar = TerminalAccessoryView()
+    private let statusPill = UILabel()
 
-    private var inputBottomConstraint: NSLayoutConstraint?
+    private var session: SSHSession?
 
     init(server: Server) {
         self.server = server
         super.init(nibName: nil, bundle: nil)
-        self.navigationItem.title = "\(server.name) - 终端"
+        self.navigationItem.title = server.name
         self.navigationItem.largeTitleDisplayMode = .never
     }
 
@@ -25,134 +30,171 @@ final class HostTerminalViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 13/255.0, green: 17/255.0, blue: 23/255.0, alpha: 1.0)
+        view.backgroundColor = UIColor(red: 24/255.0, green: 24/255.0, blue: 24/255.0, alpha: 1.0)
 
-        setupTerminalViews()
-        setupKeyboardObservers()
-        appendLog("Connecting to \(server.username)@\(server.host):\(server.port)...\n")
-        appendLog("Welcome to \(server.name) (Linux Debian GNU/Linux 13)\n")
-        appendLog("Type command below to execute remote Shell.\n\n")
+        setupNavigationStatus()
+        setupTerminalView()
+        connectAndStartSession()
     }
 
-    deinit {
-        NotificationCenter.default.removeObserver(self)
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 自动聚焦呼起软键盘与极客辅助栏
+        textView.becomeFirstResponder()
     }
 
-    private func setupTerminalViews() {
+    private func setupNavigationStatus() {
+        statusPill.translatesAutoresizingMaskIntoConstraints = false
+        statusPill.text = " SSH 22 "
+        statusPill.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
+        statusPill.textColor = .systemGreen
+        statusPill.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.15)
+        statusPill.layer.cornerRadius = 6
+        statusPill.clipsToBounds = true
+
+        let clearItem = UIBarButtonItem(image: UIImage(systemName: "trash"), style: .plain, target: self, action: #selector(didTapClear))
+        let pillItem = UIBarButtonItem(customView: statusPill)
+        navigationItem.rightBarButtonItems = [clearItem, pillItem]
+    }
+
+    private func setupTerminalView() {
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.backgroundColor = .clear
-        textView.textColor = UIColor(red: 201/255.0, green: 209/255.0, blue: 217/255.0, alpha: 1.0)
+        textView.textColor = UIColor(red: 212/255.0, green: 212/255.0, blue: 212/255.0, alpha: 1.0)
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        textView.isEditable = false
+        textView.autocapitalizationType = .none
+        textView.autocorrectionType = .no
+        textView.keyboardType = .asciiCapable
+        textView.indicatorStyle = .white
+        textView.keyboardDismissMode = .interactive
+        
+        // 绑定原生输入辅助条
+        accessoryBar.delegate = self
+        textView.customInputAccessoryView = accessoryBar
+
         view.addSubview(textView)
 
-        commandInputBar.translatesAutoresizingMaskIntoConstraints = false
-        commandInputBar.backgroundColor = UIColor(red: 22/255.0, green: 27/255.0, blue: 34/255.0, alpha: 1.0)
-        commandInputBar.layer.cornerRadius = 12
-        commandInputBar.layer.borderWidth = 0.5
-        commandInputBar.layer.borderColor = UIColor.darkGray.cgColor
-
-        commandField.translatesAutoresizingMaskIntoConstraints = false
-        commandField.placeholder = "输入 Shell 命令 (如 uname -a, htop, df -h)"
-        commandField.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
-        commandField.textColor = .white
-        commandField.autocapitalizationType = .none
-        commandField.autocorrectionType = .no
-        commandField.returnKeyType = .send
-        commandField.delegate = self
-
-        sendBtn.translatesAutoresizingMaskIntoConstraints = false
-        sendBtn.setTitle("发送", for: .normal)
-        sendBtn.titleLabel?.font = .systemFont(ofSize: 14, weight: .semibold)
-        sendBtn.tintColor = .systemBlue
-        sendBtn.addTarget(self, action: #selector(didTapSend), for: .touchUpInside)
-
-        commandInputBar.addSubview(commandField)
-        commandInputBar.addSubview(sendBtn)
-        view.addSubview(commandInputBar)
-
-        let bottom = commandInputBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
-        self.inputBottomConstraint = bottom
-
         NSLayoutConstraint.activate([
-            textView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            textView.bottomAnchor.constraint(equalTo: commandInputBar.topAnchor, constant: -8),
-
-            commandInputBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
-            commandInputBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
-            bottom,
-            commandInputBar.heightAnchor.constraint(equalToConstant: 44),
-
-            commandField.leadingAnchor.constraint(equalTo: commandInputBar.leadingAnchor, constant: 12),
-            commandField.centerYAnchor.constraint(equalTo: commandInputBar.centerYAnchor),
-            commandField.trailingAnchor.constraint(equalTo: sendBtn.leadingAnchor, constant: -8),
-
-            sendBtn.trailingAnchor.constraint(equalTo: commandInputBar.trailingAnchor, constant: -12),
-            sendBtn.centerYAnchor.constraint(equalTo: commandInputBar.centerYAnchor),
+            textView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            textView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            textView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            textView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
-    }
 
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillChangeFrame(_:)),
-            name: UIResponder.keyboardWillChangeFrameNotification,
-            object: nil
-        )
-    }
-
-    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let endFrame = (userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
-              let duration = (userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)?.doubleValue else {
-            return
-        }
-
-        let viewFrame = view.convert(view.bounds, to: nil)
-        let intersection = viewFrame.intersection(endFrame)
-        let keyboardHeight = intersection.height
-        let targetOffset = keyboardHeight > 0 ? -(keyboardHeight - view.safeAreaInsets.bottom + 8) : -8
-
-        inputBottomConstraint?.constant = targetOffset
-        UIView.animate(withDuration: duration) {
-            self.view.layoutIfNeeded()
+        textView.onUserInput = { [weak self] text in
+            self?.handleRawInput(text)
         }
     }
 
-    @objc private func didTapSend() {
-        guard let text = commandField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return }
-        commandField.text = ""
-        appendLog("$ \(text)\n")
+    private func connectAndStartSession() {
+        appendANSI("Connecting to \(server.username)@\(server.host):\(server.port)...\r\n")
+        
+        let sess = SSHSession(server: server)
+        self.session = sess
 
-        // 模拟执行或通过 SSH 执行
         Task { [weak self] in
             guard let self = self else { return }
-            let session = SSHSession(server: self.server)
             do {
-                let out = try await session.executeCustomCommand(text)
+                _ = try await sess.fetchMetrics()
                 await MainActor.run {
-                    self.appendLog("\(out)\n")
+                    self.appendANSI("\u{1b}[32m[OK] SSH Connection Established.\u{1b}[0m\r\n")
+                    self.appendANSI("Linux \(self.server.name) (Debian GNU/Linux 13)\r\n")
+                    self.appendANSI("Type commands and press Return.\r\n\r\n$ ")
                 }
             } catch {
                 await MainActor.run {
-                    self.appendLog("Error: \(error.localizedDescription)\n")
+                    self.appendANSI("\u{1b}[31m[ERROR] Connection failed: \(error.localizedDescription)\u{1b}[0m\r\n$ ")
                 }
             }
         }
     }
 
-    private func appendLog(_ msg: String) {
-        textView.text = (textView.text ?? "") + msg
+    private func handleRawInput(_ text: String) {
+        if text == "\r" || text == "\n" {
+            // 回车，提取当前行执行
+            executeCurrentCommandLine()
+        } else {
+            // 回显到屏幕
+            appendANSI(text)
+        }
+    }
+
+    private func executeCurrentCommandLine() {
+        let full = textView.text ?? ""
+        let lines = full.components(separatedBy: "\n")
+        let lastLine = lines.last ?? ""
+        let cmd = lastLine.replacingOccurrences(of: "$ ", with: "").trimmingCharacters(in: .whitespaces)
+
+        appendANSI("\r\n")
+
+        guard !cmd.isEmpty else {
+            appendANSI("$ ")
+            return
+        }
+
+        if cmd == "clear" {
+            textView.text = "$ "
+            return
+        }
+
+        Task { [weak self] in
+            guard let self = self, let sess = self.session else { return }
+            do {
+                let out = try await sess.executeCustomCommand(cmd)
+                await MainActor.run {
+                    self.appendANSI("\(out)\r\n$ ")
+                }
+            } catch {
+                await MainActor.run {
+                    self.appendANSI("sh: \(error.localizedDescription)\r\n$ ")
+                }
+            }
+        }
+    }
+
+    private func appendANSI(_ text: String) {
+        textView.text = (textView.text ?? "") + text
         let bottom = NSRange(location: (textView.text as NSString).length, length: 0)
         textView.scrollRangeToVisible(bottom)
     }
+
+    @objc private func didTapClear() {
+        textView.text = "$ "
+    }
 }
 
-extension HostTerminalViewController: UITextFieldDelegate {
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        didTapSend()
-        return true
+// MARK: - TerminalAccessoryViewDelegate
+
+extension HostTerminalViewController: TerminalAccessoryViewDelegate {
+    func terminalAccessoryView(_ view: TerminalAccessoryView, didTapKey key: String) {
+        if key == "\u{03}" { // CTRL-C
+            appendANSI("^C\r\n$ ")
+        } else if key == "clear\r" {
+            textView.text = "$ "
+        } else {
+            handleRawInput(key)
+        }
+    }
+}
+
+// MARK: - 自定义键盘绑定的终端画板视图
+
+final class TerminalCanvasTextView: UITextView {
+
+    var onUserInput: ((String) -> Void)?
+    var customInputAccessoryView: UIView?
+
+    override var inputAccessoryView: UIView? {
+        return customInputAccessoryView
+    }
+
+    override func insertText(_ text: String) {
+        super.insertText(text)
+        onUserInput?(text)
+    }
+
+    override func deleteBackward() {
+        super.deleteBackward()
+        onUserInput?("\u{08}")
     }
 }

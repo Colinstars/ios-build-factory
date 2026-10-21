@@ -20,10 +20,10 @@ final class ServerCell: UITableViewCell {
         let authDesc: String
         switch server.authType {
         case .password:
-            authDesc = "🔑 密码"
+            authDesc = "密码"
         case .sshKey(let keyId):
             let kName = SSHKeyStore.shared.keys.first(where: { $0.id == keyId })?.name ?? "私钥"
-            authDesc = "🛡 \(kName)"
+            authDesc = "私钥: \(kName)"
         }
         
         content.secondaryText = "\(server.username)@\(server.host):\(server.port) · \(authDesc)\(tagInfo)"

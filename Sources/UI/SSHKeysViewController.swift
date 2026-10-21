@@ -45,10 +45,10 @@ final class SSHKeysViewController: UIViewController {
 
     @objc private func didTapAdd() {
         let sheet = UIAlertController(title: "添加 SSH 密钥", message: "选择密钥添加方式：", preferredStyle: .actionSheet)
-        sheet.addAction(UIAlertAction(title: "⚡️ 自动生成全新 Ed25519 密钥对", style: .default, handler: { [weak self] _ in
+        sheet.addAction(UIAlertAction(title: "生成全新 Ed25519 密钥对", style: .default, handler: { [weak self] _ in
             self?.promptGenerateKey()
         }))
-        sheet.addAction(UIAlertAction(title: "📥 导入已有私钥 (PEM / OpenSSH)", style: .default, handler: { [weak self] _ in
+        sheet.addAction(UIAlertAction(title: "导入已有私钥 (PEM / OpenSSH)", style: .default, handler: { [weak self] _ in
             self?.promptImportKey()
         }))
         sheet.addAction(UIAlertAction(title: "取消", style: .cancel))

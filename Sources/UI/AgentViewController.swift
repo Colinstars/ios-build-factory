@@ -61,10 +61,10 @@ final class AgentViewController: UIViewController {
         view.addSubview(promptChipsScrollView)
 
         let prompts = [
-            "⚡️ 全机健康体检",
-            "🔍 排查高负载原因",
-            "🧹 清理系统无用缓存",
-            "📦 检查 Docker 容器"
+            "系统健康巡检",
+            "排查高负载进程",
+            "清理系统缓存",
+            "检查容器状态"
         ]
 
         for p in prompts {
@@ -216,11 +216,11 @@ final class AgentViewController: UIViewController {
 
     private func generateSmartReply(for input: String) -> String {
         if input.contains("体检") || input.contains("健康") {
-            return "✅ 【全机健康巡检报告】\n• CPU 负载: 0.12 / 0.08 / 0.05 (极低负载)\n• 内存健康: 充足，无 Swap 挤压\n• 磁盘根目录: 已使用 28%，空间充裕\n• 僵尸进程: 0 个\n系统状态处于健康巅峰，无需人工干预。"
+            return "【系统健康巡检报告】\n• CPU 负载: 0.12 / 0.08 / 0.05 (极低负载)\n• 内存健康: 充足，无 Swap 挤压\n• 磁盘根目录: 已使用 28%，空间充裕\n• 僵尸进程: 0 个\n系统状态处于健康巅峰，无需人工干预。"
         } else if input.contains("负载") || input.contains("慢") {
-            return "🔍 【负载深度排查结论】\n当前主机最近 15 分钟平均负载稳定在 0.05 左右，未发现计算峰值。Top 进程中无异常占用死锁。建议继续保持监控。"
+            return "【负载深度排查结论】\n当前主机最近 15 分钟平均负载稳定在 0.05 左右，未发现计算峰值。Top 进程中无异常占用死锁。建议继续保持监控。"
         } else if input.contains("清理") || input.contains("缓存") {
-            return "🧹 【智能运维执行建议】\n已准备好清理脚本：`sync; echo 3 > /proc/sys/vm/drop_caches`。\n该操作安全，可随时释放非活动文件页缓存。"
+            return "【智能运维执行建议】\n已准备好清理脚本：`sync; echo 3 > /proc/sys/vm/drop_caches`。\n该操作安全，可随时释放非活动文件页缓存。"
         } else {
             return "收到任务指令：『\(input)』\n智能体已解析语义。由于当前处于安全预览模式，自动化执行前将随时为你生成确认凭据。"
         }
