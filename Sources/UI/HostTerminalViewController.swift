@@ -1,4 +1,6 @@
 import UIKit
+import SwiftTerm
+import NIOCore
 
 /// 移动端全屏真 PTY 交互终端
 final class HostTerminalViewController: UIViewController {
