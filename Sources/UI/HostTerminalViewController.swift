@@ -70,7 +70,7 @@ final class HostTerminalViewController: UIViewController {
         
         // 绑定原生输入辅助条
         accessoryBar.delegate = self
-        textView.customInputAccessoryView = accessoryBar
+        textView.inputAccessoryView = accessoryBar
 
         view.addSubview(textView)
 
@@ -182,11 +182,6 @@ extension HostTerminalViewController: TerminalAccessoryViewDelegate {
 final class TerminalCanvasTextView: UITextView {
 
     var onUserInput: ((String) -> Void)?
-    var customInputAccessoryView: UIView?
-
-    override var inputAccessoryView: UIView? {
-        return customInputAccessoryView
-    }
 
     override func insertText(_ text: String) {
         super.insertText(text)
