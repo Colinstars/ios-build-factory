@@ -15,19 +15,38 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #1a1b26;
+      background-color: #161721;
       overflow: hidden;
+      touch-action: pan-y;
+      -webkit-user-select: none;
     }
     #terminal-container {
       width: 100%;
       height: 100%;
-      padding: 8px 6px 42px 6px;
+      padding: 6px 4px 6px 4px;
     }
     .xterm {
       height: 100%;
+      padding: 0;
     }
-    .xterm-viewport {
+    /* 核心流畅滚动修复：开启 iOS 原生弹性平滑滚动 (对标 Termius) */
+    .xterm .xterm-viewport {
       background-color: transparent !important;
+      -webkit-overflow-scrolling: touch !important;
+      overflow-y: auto !important;
+      touch-action: pan-y !important;
+    }
+    /* 解决第三方输入法 (微信键盘/搜狗/百度/Gboard) 输入不上字与 iOS 自动放大 BUG */
+    .xterm .xterm-helper-textarea {
+      font-size: 16px !important; /* 彻底禁止 iOS 聚焦时恶心缩放页面 */
+      position: absolute !important;
+      opacity: 0.001 !important; /* 保留微弱透明度供输入法挂钩，绝不能 left: -9999em 移出屏幕 */
+      left: 0 !important;
+      top: 0 !important;
+      width: 1px !important;
+      height: 1px !important;
+      z-index: 10 !important;
+      pointer-events: none !important;
     }
   </style>
 </head>
@@ -38,19 +57,19 @@
   <script src="xterm-addon-fit.js"></script>
 
   <script>
-    // 工业级 Tokyo Night / One Dark 经典配色与专业渲染设置 (对标 Blink & WebSSH)
+    // 工业级 Tokyo Night / Termius 经典深蓝黑高对比配色
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: 'block',
       fontSize: 13,
-      fontFamily: '"SF Mono", Menlo, Monaco, Consolas, "Courier New", monospace',
+      fontFamily: '"SF Mono", Menlo, Monaco, Consolas, monospace',
       lineHeight: 1.25,
       theme: {
-        background: '#1a1b26',
+        background: '#161721',
         foreground: '#c0caf5',
         cursor: '#7aa2f7',
-        cursorAccent: '#1a1b26',
-        selectionBackground: 'rgba(122, 162, 247, 0.3)',
+        cursorAccent: '#161721',
+        selectionBackground: 'rgba(122, 162, 247, 0.35)',
         black: '#15161e',
         red: '#f7768e',
         green: '#9ece6a',
@@ -69,7 +88,8 @@
         brightWhite: '#c0caf5'
       },
       convertEol: true,
-      allowProposedApi: true
+      allowProposedApi: true,
+      scrollback: 5000
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -78,6 +98,32 @@
     const container = document.getElementById('terminal-container');
     term.open(container);
     fitAddon.fit();
+
+    // 针对 iOS 第三方输入法（微信输入法/搜狗/百度/拼音）做输入穿透兜底
+    setTimeout(() => {
+      const ta = container.querySelector('.xterm-helper-textarea');
+      if (ta) {
+        ta.setAttribute('autocapitalize', 'off');
+        ta.setAttribute('autocorrect', 'off');
+        ta.setAttribute('autocomplete', 'off');
+        ta.setAttribute('spellcheck', 'false');
+        ta.setAttribute('inputmode', 'text');
+
+        // 监听 compositionend 与 input 事件：防止输入法候选词被 xterm 截断
+        ta.addEventListener('compositionend', (e) => {
+          if (e.data) {
+            sendInput(e.data);
+          }
+        });
+
+        ta.addEventListener('input', (e) => {
+          // 如果是非直接键盘事件 (例如某些第三方拼音键盘直接修改 value)
+          if (e.inputType === 'insertText' && e.data) {
+            // xterm 自身的 onData 可能会处理，但若被拦截则兜底
+          }
+        });
+      }
+    }, 200);
 
     window.addEventListener('resize', () => {
       fitAddon.fit();
@@ -93,10 +139,35 @@
       }
     }
 
-    // 聚焦输入
+    function sendInput(data) {
+      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.terminalInput) {
+        window.webkit.messageHandlers.terminalInput.postMessage({ data: data });
+      }
+    }
+
+    // 点击任意终端区域立即聚焦，唤起软键盘
     window.addEventListener('click', () => {
       term.focus();
     });
+
+    // 触摸滑动优化
+    let touchStartY = 0;
+    container.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    container.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) {
+        const deltaY = e.touches[0].clientY - touchStartY;
+        touchStartY = e.touches[0].clientY;
+        // 平滑滚动 xterm 视口
+        if (Math.abs(deltaY) > 2) {
+          term.scrollLines(deltaY > 0 ? -1 : 1);
+        }
+      }
+    }, { passive: true });
 
     // 原生向 JS 注入终端输出流
     window.writeBase64 = function(b64) {
@@ -110,9 +181,7 @@
 
     // 用户在终端输入时向原生上报
     term.onData(data => {
-      if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.terminalInput) {
-        window.webkit.messageHandlers.terminalInput.postMessage({ data: data });
-      }
+      sendInput(data);
     });
 
     // 清屏
@@ -130,7 +199,7 @@
       fitAddon.fit();
       term.focus();
       reportSize();
-    }, 100);
+    }, 150);
   </script>
 </body>
 </html>

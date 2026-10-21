@@ -70,7 +70,9 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         webView.translatesAutoresizingMaskIntoConstraints = false
         webView.backgroundColor = .clear
         webView.isOpaque = false
-        webView.scrollView.bounces = false
+        webView.scrollView.bounces = true
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.isScrollEnabled = false // 由 xterm 内部接管丝滑虚拟滚动，避免外层外框撕裂
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(webView)
 
