@@ -285,4 +285,8 @@ final class TerminalAccessoryView: UIView {
     func updateServerTitle(_ title: String) {
         sessionTitleLabel.text = title
     }
+
+    override var intrinsicContentSize: CGSize {
+        return CGSize(width: UIView.noIntrinsicMetric, height: 82)
+    }
 }

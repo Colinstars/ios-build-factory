@@ -2,23 +2,21 @@ import UIKit
 import SwiftTerm
 import NIOCore
 
-/// 工业级移动端全屏原生真 PTY 交互终端 (基于 migueldeicaza/SwiftTerm 官方原生 UIKit 引擎)
+/// 工业级移动端全屏原生真 PTY 交互终端 (对齐 Termius 官方真机 inputAccessoryView 架构)
 ///
-/// 针对 tmux / curses 全屏交互软件的物理级深度优化：
-/// 1. 【动态 SIGWINCH 联动】：在 `sizeChanged` 回调中将实际终端行列数 (cols/rows) 瞬时同步给远端 Linux 内核，让 tmux 准确得知手机屏幕尺寸，彻底杜绝换行错乱与重影！
-/// 2. 【高阶按键完备映射】：为 accessoryBar 扩展 F1~F12、Home、End、PageUp、PageDown、Insert 及方向键的完整 ANSI Escape 序列；
-/// 3. 【原生等宽字体与自适应网格】：使用 Menlo / SF Mono 等宽核心字体，确保制表符、方框边框（UTF-8 Box Drawing）像素级严丝合缝！
+/// 核心修复根因：
+/// 1. 【inputAccessoryView 官方标准实现】：彻底抛弃手写 AutoLayout 约束浮动！直接把双层控制条赋值给 `terminalView.inputAccessoryView`。这样当软键盘弹起时，控制条由 iOS 系统窗口层直接贴合在键盘顶部；当键盘收起时，终端 100% 独占整个屏幕直至屏幕最底部（Safe Area Bottom），绝不会悬空截断！
+/// 2. 【tmux 状态栏贴底机制】：终端视口铺满全屏，tmux 的绿色状态栏自然位于视口最后一行（贴合最底部）；
+/// 3. 【自动尺寸动态上报】：键盘弹起时系统挤压视口，SwiftTerm 会实时调用 `sizeChanged` 通知远端重绘；
 final class HostTerminalViewController: UIViewController {
 
     private let server: Server
     private var terminalView: TerminalView!
-    private var accessoryContainer: TerminalAccessoryView!
-    private var accessoryBottomConstraint: NSLayoutConstraint?
+    private var accessoryBar: TerminalAccessoryView!
 
     private var session: SSHSession?
     private var ptyRelay: SSHPtyStreamRelay?
 
-    // 记录最新终端字符网格尺寸
     private var currentCols: Int = 80
     private var currentRows: Int = 24
 
@@ -47,8 +45,6 @@ final class HostTerminalViewController: UIViewController {
         view.backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 1.0)
 
         setupTerminalView()
-        setupAccessoryBar()
-        setupKeyboardObservers()
         startInteractivePtySession()
     }
 
@@ -62,16 +58,25 @@ final class HostTerminalViewController: UIViewController {
         terminalView.terminalDelegate = self
         terminalView.backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 1.0)
 
-        // 核心等宽字体配置：12pt Menlo，为 ASCII / Unicode 框线提供严苛的 1:2 几何对齐
+        // 等宽字体：Menlo 12pt
         terminalView.font = UIFont(name: "Menlo-Regular", size: 12) ?? UIFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         terminalView.caretColor = UIColor(red: 122/255.0, green: 162/255.0, blue: 247/255.0, alpha: 1.0)
 
+        // 核心：使用官方标准的 inputAccessoryView 挂载双层控制栏
+        accessoryBar = TerminalAccessoryView(serverTitle: server.name)
+        accessoryBar.delegate = self
+        // 设置自定义高度为 82
+        accessoryBar.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 82)
+        terminalView.inputAccessoryView = accessoryBar
+
         view.addSubview(terminalView)
 
+        // 终端铺满整个屏幕，从顶部 Safe Area 一直打到最底部屏幕边缘
         NSLayoutConstraint.activate([
             terminalView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             terminalView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            terminalView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+            terminalView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            terminalView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(didTapTerminal))
@@ -82,56 +87,13 @@ final class HostTerminalViewController: UIViewController {
         terminalView.becomeFirstResponder()
     }
 
-    private func setupAccessoryBar() {
-        accessoryContainer = TerminalAccessoryView(serverTitle: server.name)
-        accessoryContainer.translatesAutoresizingMaskIntoConstraints = false
-        accessoryContainer.delegate = self
-        view.addSubview(accessoryContainer)
-
-        let bottomConstraint = accessoryContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
-        self.accessoryBottomConstraint = bottomConstraint
-
-        NSLayoutConstraint.activate([
-            accessoryContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            accessoryContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            accessoryContainer.heightAnchor.constraint(equalToConstant: 80),
-            bottomConstraint,
-
-            terminalView.bottomAnchor.constraint(equalTo: accessoryContainer.topAnchor)
-        ])
-    }
-
-    private func setupKeyboardObservers() {
-        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChangeFrame(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
-    }
-
-    @objc private func keyboardWillChangeFrame(_ note: Notification) {
-        guard let userInfo = note.userInfo,
-              let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
-              let curveVal = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
-
-        let screenH = UIScreen.main.bounds.height
-        let isHiding = endFrame.origin.y >= screenH
-        let safeAreaBottom = view.safeAreaInsets.bottom
-
-        let offset = isHiding ? 0 : -(endFrame.height - safeAreaBottom)
-        accessoryBottomConstraint?.constant = offset
-
-        let opts = UIView.AnimationOptions(rawValue: curveVal << 16)
-        UIView.animate(withDuration: duration, delay: 0, options: opts, animations: {
-            self.view.layoutIfNeeded()
-        })
-    }
-
-    /// 核心架构：启动真正的远程 Linux PTY 会话并与 SwiftTerm 直连
+    /// 启动远程 Linux PTY 会话
     private func startInteractivePtySession() {
         terminalView.feed(text: "Connecting to \(server.username)@\(server.host):\(server.port) via native PTY...\r\n")
 
         let sess = SSHSession(server: server)
         self.session = sess
 
-        // 获取终端初始行列，默认 80x24
         let initialCols = max(20, currentCols)
         let initialRows = max(10, currentRows)
 
@@ -149,7 +111,6 @@ final class HostTerminalViewController: UIViewController {
 
                 await MainActor.run {
                     self.ptyRelay = relay
-                    // 连通后立即触发一次当前真实尺寸的同步广播，确保远端 tmux 立刻自适应
                     relay.resize(cols: self.currentCols, rows: self.currentRows)
                     self.terminalView.becomeFirstResponder()
                 }
@@ -175,7 +136,6 @@ final class HostTerminalViewController: UIViewController {
         }))
         alert.addAction(UIAlertAction(title: "强制刷新屏幕 (Redraw)", style: .default, handler: { [weak self] _ in
             guard let self = self else { return }
-            // 发送 tmux 强制重绘快捷键 (Ctrl+L) 并重发窗口尺寸
             self.ptyRelay?.writeString("\u{0c}")
             self.ptyRelay?.resize(cols: self.currentCols, rows: self.currentRows)
         }))
@@ -207,11 +167,10 @@ extension HostTerminalViewController: TerminalViewDelegate {
 
     func setTerminalTitle(source: TerminalView, title: String) {
         DispatchQueue.main.async {
-            self.accessoryContainer.updateServerTitle(title.isEmpty ? self.server.name : title)
+            self.accessoryBar.updateServerTitle(title.isEmpty ? self.server.name : title)
         }
     }
 
-    /// 核心生命周期修复：当屏幕旋转、软键盘高度变化导致终端字符网格尺寸改变时，向远端 Linux / tmux 发送动态 SIGWINCH！
     func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
         guard newCols > 0, newRows > 0 else { return }
         self.currentCols = newCols
