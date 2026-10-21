@@ -120,6 +120,11 @@
       term.clear();
     };
 
+    window.fitTerminal = function() {
+      fitAddon.fit();
+      reportSize();
+    };
+
     // 初始聚焦与自适应
     setTimeout(() => {
       fitAddon.fit();

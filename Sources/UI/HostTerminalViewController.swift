@@ -2,18 +2,24 @@ import UIKit
 import WebKit
 import NIOCore
 
-/// 工业级移动端全屏真 PTY 交互终端 (100% 对标 iTerm / Blink Shell / Termius 生产级体验)
+/// 工业级移动端全屏真 PTY 交互终端 (100% 对标 Termius 官方真机极客体验)
 ///
-/// 核心修复：
-/// 1. 显式设置 `hidesBottomBarWhenPushed = true`，彻底消除终端底部漏出白色 TabBar 的恶心瑕疵！
-/// 2. 沉浸式全黑导航头：背景完全与终端一体化，彻底消除刺眼冲突；
-/// 3. 精准错误解析：拦截 `Citadel.SSHClientError 错误 4`，给出明确的『认证失败：服务器拒绝了当前密码，请进入【设置➔SSH密钥】导入或生成密钥认证』引导，不再吐底层代码！
+/// 视觉与交互重塑：
+/// 1. 彻底隐藏系统顶部导航栏 (`navigationBar.isHidden = true`)，顶部 0 遮挡，终端直接延展至灵动岛/状态栏下方！
+/// 2. 右侧悬浮半透明胶囊把手（Termius 标志性右侧边抽屉呼出把手）；
+/// 3. 底部集成 Termius 官方同款的双层辅助栏：
+///    - 第一层：会话标签栏 `[ < 返回 ]  [ 🐚 DMIT-LAX  ⓧ ]  [ + ]  [ 田 ]`
+///    - 第二层：专业物理按键行 `[shift tab] [?] [/] [📋] [esc] [tab] [ctrl] [alt] [^C] [⌨️]`
+/// 4. 键盘弹起与收起时，辅助栏与 WebKit 视口自适应联动，绝对不留黑白割裂。
 final class HostTerminalViewController: UIViewController, WKScriptMessageHandler {
 
     private let server: Server
     private var webView: WKWebView!
-    private let accessoryBar = TerminalAccessoryView()
-    private let statusPill = UILabel()
+    private var accessoryContainer: TerminalAccessoryView!
+    private var accessoryBottomConstraint: NSLayoutConstraint?
+
+    // Termius 标志性右侧边缘悬浮把手
+    private let rightEdgeHandle = UIButton(type: .system)
 
     private var session: SSHSession?
     private var ptyRelay: SSHPtyStreamRelay?
@@ -21,9 +27,6 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
     init(server: Server) {
         self.server = server
         super.init(nibName: nil, bundle: nil)
-        self.navigationItem.title = server.name
-        self.navigationItem.largeTitleDisplayMode = .never
-        // 关键体验：终端作为沉浸式全屏工具，推入时必须彻底隐藏底部 TabBar！
         self.hidesBottomBarWhenPushed = true
     }
 
@@ -31,39 +34,33 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // 关键：彻底隐藏顶部导航栏，实现 100% 沉浸全屏终端！
+        navigationController?.setNavigationBarHidden(true, animated: animated)
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // 离开终端时还原系统导航栏
+        navigationController?.setNavigationBarHidden(false, animated: animated)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 26/255.0, green: 27/255.0, blue: 38/255.0, alpha: 1.0)
+        // Termius 经典深蓝黑底色
+        view.backgroundColor = UIColor(red: 22/255.0, green: 23/255.0, blue: 33/255.0, alpha: 1.0)
 
-        setupNavigationStatus()
         setupWebView()
+        setupAccessoryBar()
+        setupRightEdgeHandle()
+        setupKeyboardObservers()
         loadXterm()
         startInteractivePtySession()
     }
 
-    private func setupNavigationStatus() {
-        // 定制全黑沉浸式导航栏外观
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 26/255.0, green: 27/255.0, blue: 38/255.0, alpha: 1.0)
-        appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
-        appearance.shadowColor = .clear
-        
-        navigationItem.standardAppearance = appearance
-        navigationItem.scrollEdgeAppearance = appearance
-        navigationController?.navigationBar.tintColor = .white
-
-        statusPill.translatesAutoresizingMaskIntoConstraints = false
-        statusPill.text = " PTY 22 "
-        statusPill.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
-        statusPill.textColor = .systemGreen
-        statusPill.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.15)
-        statusPill.layer.cornerRadius = 6
-        statusPill.clipsToBounds = true
-
-        let clearItem = UIBarButtonItem(image: UIImage(systemName: "trash"), style: .plain, target: self, action: #selector(didTapClear))
-        let pillItem = UIBarButtonItem(customView: statusPill)
-        navigationItem.rightBarButtonItems = [clearItem, pillItem]
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        return .lightContent
     }
 
     private func setupWebView() {
@@ -81,14 +78,81 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         view.addSubview(webView)
 
+        // 顶部直通 Safe Area Top，不留任何多余灰色横条
         NSLayoutConstraint.activate([
             webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
+    }
 
-        accessoryBar.delegate = self
+    private func setupAccessoryBar() {
+        accessoryContainer = TerminalAccessoryView(serverTitle: server.name)
+        accessoryContainer.translatesAutoresizingMaskIntoConstraints = false
+        accessoryContainer.delegate = self
+        view.addSubview(accessoryContainer)
+
+        let bottomConstraint = accessoryContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+        self.accessoryBottomConstraint = bottomConstraint
+
+        NSLayoutConstraint.activate([
+            accessoryContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            accessoryContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            accessoryContainer.heightAnchor.constraint(equalToConstant: 80),
+            bottomConstraint,
+
+            webView.bottomAnchor.constraint(equalTo: accessoryContainer.topAnchor)
+        ])
+    }
+
+    private func setupRightEdgeHandle() {
+        // Termius 标志性右侧边半透明把手
+        rightEdgeHandle.translatesAutoresizingMaskIntoConstraints = false
+        let cfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
+        rightEdgeHandle.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
+        rightEdgeHandle.tintColor = UIColor(white: 0.8, alpha: 0.8)
+        rightEdgeHandle.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        rightEdgeHandle.layer.cornerRadius = 14
+        rightEdgeHandle.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
+        rightEdgeHandle.clipsToBounds = true
+
+        rightEdgeHandle.addAction(UIAction(handler: { [weak self] _ in
+            self?.didTapMenuAction()
+        }), for: .touchUpInside)
+
+        view.addSubview(rightEdgeHandle)
+
+        NSLayoutConstraint.activate([
+            rightEdgeHandle.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            rightEdgeHandle.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
+            rightEdgeHandle.widthAnchor.constraint(equalToConstant: 24),
+            rightEdgeHandle.heightAnchor.constraint(equalToConstant: 64)
+        ])
+    }
+
+    private func setupKeyboardObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillChangeFrame(_:)), name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+    }
+
+    @objc private func keyboardWillChangeFrame(_ note: Notification) {
+        guard let userInfo = note.userInfo,
+              let endFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
+              let curveVal = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
+
+        let screenH = UIScreen.main.bounds.height
+        let isHiding = endFrame.origin.y >= screenH
+        let safeAreaBottom = view.safeAreaInsets.bottom
+
+        let offset = isHiding ? 0 : -(endFrame.height - safeAreaBottom)
+        accessoryBottomConstraint?.constant = offset
+
+        let opts = UIView.AnimationOptions(rawValue: curveVal << 16)
+        UIView.animate(withDuration: duration, delay: 0, options: opts, animations: {
+            self.view.layoutIfNeeded()
+        }, completion: { _ in
+            self.webView.evaluateJavaScript("window.fitTerminal && window.fitTerminal()")
+        })
     }
 
     private func loadXterm() {
@@ -123,8 +187,8 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
                     if errDesc.contains("4") || errDesc.contains("allAuthenticationOptionsFailed") {
                         self.appendOutput("\r\n\u{1b}[31m[SSH 认证失败]\u{1b}[0m\r\n")
                         self.appendOutput("远端服务器拒绝了连接鉴权。\r\n")
-                        self.appendOutput("原因：当前使用空密码登录，但该主机已开启公钥认证保护。\r\n")
-                        self.appendOutput("解决方式：请在【设置 ➔ SSH 密钥】导入或生成密钥，并在编辑主机时关联对应私钥。\r\n\r\n")
+                        self.appendOutput("原因：当前主机设置了密码登录，但该主机仅允许私钥认证。\r\n")
+                        self.appendOutput("指引：请进入【设置 ➔ SSH 密钥】导入您的 ed25519 私钥并在主机配置中选中。\r\n\r\n")
                     } else {
                         self.appendOutput("\r\n\u{1b}[31m[PTY Error: \(errDesc)]\u{1b}[0m\r\n\r\n")
                     }
@@ -140,8 +204,19 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
         }
     }
 
-    @objc private func didTapClear() {
-        webView.evaluateJavaScript("window.clearTerminal()")
+    private func didTapMenuAction() {
+        let alert = UIAlertController(title: server.name, message: "\(server.host):\(server.port)", preferredStyle: .actionSheet)
+        alert.addAction(UIAlertAction(title: "清空终端 (Clear)", style: .default, handler: { [weak self] _ in
+            self?.webView.evaluateJavaScript("window.clearTerminal()")
+        }))
+        alert.addAction(UIAlertAction(title: "重新连接 (Reconnect)", style: .default, handler: { [weak self] _ in
+            self?.startInteractivePtySession()
+        }))
+        alert.addAction(UIAlertAction(title: "断开并退出", style: .destructive, handler: { [weak self] _ in
+            self?.navigationController?.popViewController(animated: true)
+        }))
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
     }
 
     // MARK: - WKScriptMessageHandler
@@ -155,10 +230,40 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
     }
 }
 
-// MARK: - TerminalAccessoryViewDelegate
+// MARK: - TerminalAccessoryViewDelegate (Termius 交互协议实现)
 
 extension HostTerminalViewController: TerminalAccessoryViewDelegate {
-    func terminalAccessoryView(_ view: TerminalAccessoryView, didTapKey key: String) {
+
+    func terminalAccessoryViewDidTapBack(_ view: TerminalAccessoryView) {
+        navigationController?.popViewController(animated: true)
+    }
+
+    func terminalAccessoryViewDidTapCloseSession(_ view: TerminalAccessoryView) {
+        navigationController?.popViewController(animated: true)
+    }
+
+    func terminalAccessoryViewDidTapNewTab(_ view: TerminalAccessoryView) {
+        let alert = UIAlertController(title: "新建会话", message: "多标签页会话支持将在后续版本开放", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+
+    func terminalAccessoryViewDidTapMenu(_ view: TerminalAccessoryView) {
+        didTapMenuAction()
+    }
+
+    func terminalAccessoryView(_ view: TerminalAccessoryView, didSendKey key: String) {
         ptyRelay?.writeString(key)
+    }
+
+    func terminalAccessoryViewDidTapPaste(_ view: TerminalAccessoryView) {
+        if let clip = UIPasteboard.general.string {
+            ptyRelay?.writeString(clip)
+        }
+    }
+
+    func terminalAccessoryViewDidTapDismissKeyboard(_ view: TerminalAccessoryView) {
+        view.endEditing(true)
+        webView.endEditing(true)
     }
 }
