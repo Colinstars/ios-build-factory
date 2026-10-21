@@ -15,17 +15,26 @@ final class SSHPtyStreamRelay: @unchecked Sendable {
         self.stdinWriter = writer
     }
 
-    func writeString(_ text: String) {
+    /// 核心优化：直接传递原始字节，杜绝 UTF-8 字符串二次转码导致非标准终端控制序列撕裂
+    func writeBytes(_ bytes: [UInt8]) {
         lock.lock()
         let writer = self.stdinWriter
         lock.unlock()
 
         guard let writer = writer else { return }
         var buffer = ByteBuffer()
-        buffer.writeString(text)
+        buffer.writeBytes(bytes)
         Task {
-            try? await writer.write(buffer)
+            do {
+                try await writer.write(buffer)
+            } catch {
+                // 静默忽略在管道正常关闭后的残余写失败，防止抛出错误 6
+            }
         }
+    }
+
+    func writeString(_ text: String) {
+        writeBytes(Array(text.utf8))
     }
 
     /// 核心修复：当 iOS 屏幕旋转、键盘弹起收起、或 SwiftTerm 字符网格尺寸改变时，向远端 Linux / tmux 发送 SIGWINCH
@@ -82,9 +91,13 @@ extension SSHSession {
                     }
                 }
             } catch {
-                var errBuf = ByteBuffer()
-                errBuf.writeString("\r\n\u{1b}[31m[SSH Session Terminated: \(error.localizedDescription)]\u{1b}[0m\r\n")
-                onOutput(errBuf)
+                // 友好拦截通道正常退出或管道半关闭信号
+                let desc = error.localizedDescription
+                if !desc.contains("ioOnClosedChannel") && !desc.contains("alreadyClosed") && !desc.contains("6") {
+                    var errBuf = ByteBuffer()
+                    errBuf.writeString("\r\n\u{1b}[33m[SSH 会话已关闭: \(desc)]\u{1b}[0m\r\n")
+                    onOutput(errBuf)
+                }
             }
         }
 

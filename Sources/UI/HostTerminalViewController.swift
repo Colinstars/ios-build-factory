@@ -154,12 +154,7 @@ final class HostTerminalViewController: UIViewController {
 extension HostTerminalViewController: TerminalViewDelegate {
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {
-        if let str = String(bytes: data, encoding: .utf8) {
-            ptyRelay?.writeString(str)
-        } else {
-            let str = String(decoding: data, as: UTF8.self)
-            ptyRelay?.writeString(str)
-        }
+        ptyRelay?.writeBytes(Array(data))
     }
 
     func scrolled(source: TerminalView, position: Double) {}

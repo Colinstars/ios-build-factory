@@ -70,7 +70,6 @@ actor SSHSession {
         let sections = text.components(separatedBy: "===\n")
         guard sections.count >= 5 else { return m }
 
-        // 1. loadavg
         let loadParts = sections[0].trimmingCharacters(in: .whitespacesAndNewlines).split(separator: " ")
         if loadParts.count >= 3 {
             m.load1 = Double(loadParts[0]) ?? 0
@@ -78,7 +77,6 @@ actor SSHSession {
             m.load15 = Double(loadParts[2]) ?? 0
         }
 
-        // 2. meminfo
         for line in sections[1].split(separator: "\n") {
             if line.hasPrefix("MemTotal:") {
                 m.memTotalMB = parseKB(line) / 1024.0
@@ -87,7 +85,6 @@ actor SSHSession {
             }
         }
 
-        // 3. df -k /
         let dfLines = sections[2].split(separator: "\n")
         if dfLines.count >= 2 {
             let cols = dfLines[1].split(whereSeparator: { $0.isWhitespace })
@@ -99,19 +96,17 @@ actor SSHSession {
             }
         }
 
-        // 4. uptime -p
         m.uptimeString = sections[3].trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // 5. uname
         m.osString = sections[4].trimmingCharacters(in: .whitespacesAndNewlines)
-
+        m.sampledAt = Date()
         return m
     }
 
-    private func parseKB<S: StringProtocol>(_ line: S) -> Double {
-        let parts = line.split(separator: ":")
-        guard parts.count >= 2 else { return 0 }
-        let numStr = parts[1].trimmingCharacters(in: .whitespaces).split(separator: " ").first ?? ""
-        return Double(numStr) ?? 0
+    private func parseKB(_ line: String.SubSequence) -> Double {
+        let parts = line.split(whereSeparator: { $0.isWhitespace })
+        if parts.count >= 2, let val = Double(parts[1]) {
+            return val
+        }
+        return 0
     }
 }
