@@ -108,7 +108,7 @@ final class AddServerViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = SheetColorScheme.background
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.keyboardDismissMode = .onDrag
