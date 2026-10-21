@@ -15,8 +15,20 @@ final class ServerCell: UITableViewCell {
     func configure(with server: Server) {
         var content = UIListContentConfiguration.subtitleCell()
         content.text = server.name
-        content.secondaryText = "\(server.username)@\(server.host):\(server.port)"
-        content.secondaryTextProperties.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+        
+        let tagInfo = server.tag.map { " [\($0)]" } ?? ""
+        let authDesc: String
+        switch server.authType {
+        case .password:
+            authDesc = "🔑 密码"
+        case .sshKey(let keyId):
+            let kName = SSHKeyStore.shared.keys.first(where: { $0.id == keyId })?.name ?? "私钥"
+            authDesc = "🛡 \(kName)"
+        }
+        
+        content.secondaryText = "\(server.username)@\(server.host):\(server.port) · \(authDesc)\(tagInfo)"
+        content.secondaryTextProperties.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        content.secondaryTextProperties.color = .secondaryLabel
         content.image = UIImage(systemName: "server.rack")
         content.imageProperties.tintColor = .systemBlue
         contentConfiguration = content

@@ -26,9 +26,9 @@ final class MainTabBarController: UITabBarController {
         let dockerNav = UINavigationController(rootViewController: GlobalDockerViewController())
         dockerNav.tabBarItem = UITabBarItem(title: "容器", image: UIImage(systemName: "shippingbox"), selectedImage: UIImage(systemName: "shippingbox.fill"))
 
-        // 5. 更多 (GlobalOpsViewController)
+        // 5. 设置 (对标 Termius Settings / ServerCat 设置，收拢 SSH 密钥库与全局偏好)
         let opsNav = UINavigationController(rootViewController: GlobalOpsViewController())
-        opsNav.tabBarItem = UITabBarItem(title: "更多", image: UIImage(systemName: "ellipsis.circle"), selectedImage: UIImage(systemName: "ellipsis.circle.fill"))
+        opsNav.tabBarItem = UITabBarItem(title: "设置", image: UIImage(systemName: "gearshape"), selectedImage: UIImage(systemName: "gearshape.fill"))
 
         viewControllers = [hostsNav, agentNav, filesNav, dockerNav, opsNav]
     }

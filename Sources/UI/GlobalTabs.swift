@@ -40,7 +40,7 @@ final class GlobalDockerViewController: UIViewController {
     }
 }
 
-// MARK: - 3. 底部【更多】全局页面 (纯 UI 稳定呈现，导航栏上滑遮罩完美贴合)
+// MARK: - 3. 底部【设置】全局页面 (纯 UI 稳定呈现，导航栏上滑遮罩完美贴合)
 
 final class GlobalOpsViewController: UIViewController {
 
@@ -48,7 +48,7 @@ final class GlobalOpsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "更多"
+        self.navigationItem.title = "设置"
         navigationController?.navigationBar.prefersLargeTitles = true
         view.backgroundColor = .systemGroupedBackground
 

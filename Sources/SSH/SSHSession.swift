@@ -1,6 +1,7 @@
 import Foundation
 import Citadel
 import NIOCore
+import CryptoKit
 
 actor SSHSession {
 
@@ -25,8 +26,12 @@ actor SSHSession {
                 switch auth {
                 case .password(let pwd):
                     return .passwordBased(username: user, password: pwd)
-                case .privateKey:
-                    // 预留密钥认证路径（Ed25519 / RSA），P0 暂未开放时走空密码回退
+                case .sshKey(let keyId):
+                    if let keyObj = SSHKeyStore.shared.keys.first(where: { $0.id == keyId }),
+                       let rawData = Data(base64Encoded: keyObj.privateKeyPEM),
+                       let privKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: rawData) {
+                        return .ed25519(username: user, privateKey: privKey)
+                    }
                     return .passwordBased(username: user, password: "")
                 }
             },

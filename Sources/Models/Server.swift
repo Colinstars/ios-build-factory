@@ -7,10 +7,11 @@ struct Server: Identifiable, Codable, Hashable {
     var port: Int
     var username: String
     var authType: AuthType
+    var tag: String?            // 分组标签 (如: 生产, 测试, 香港)
 
     enum AuthType: Codable, Hashable {
         case password(String)
-        case privateKey(key: String, passphrase: String?)
+        case sshKey(keyId: UUID)
     }
 
     init(id: UUID = UUID(),
@@ -18,13 +19,15 @@ struct Server: Identifiable, Codable, Hashable {
          host: String,
          port: Int = 22,
          username: String = "root",
-         authType: AuthType) {
+         authType: AuthType,
+         tag: String? = nil) {
         self.id = id
         self.name = name
         self.host = host
         self.port = port
         self.username = username
         self.authType = authType
+        self.tag = tag
     }
 }
 

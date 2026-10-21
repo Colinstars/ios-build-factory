@@ -1,8 +1,8 @@
 import UIKit
 
 /// 单机深度控制面板：
-/// 当用户在首页【状态】列表点击某台特定服务器下钻时展示。
-/// 顶部提供精准指标切片与快捷操作。
+/// 当用户在首页【主机】列表点击某台特定服务器下钻时展示。
+/// 顶部展示实时状态指标，下方提供一键进入该主机的专属交互式终端操作。
 final class ServerDetailViewController: UIViewController {
 
     private let server: Server
@@ -16,8 +16,8 @@ final class ServerDetailViewController: UIViewController {
     private let diskCard = MetricCardView(title: "磁盘使用 (/)", icon: "internaldrive")
     private let infoCard = MetricCardView(title: "系统概览", icon: "info.circle")
 
-    // 快捷行动区
-    private let actionsCard = MetricCardView(title: "节点会话", icon: "bolt.horizontal.fill")
+    // 核心会话操作卡片 (支持一键打开专属终端)
+    private let openTerminalButton = UIButton(type: .system)
 
     private var pollTimer: Timer?
     private var isFetching = false
@@ -26,9 +26,6 @@ final class ServerDetailViewController: UIViewController {
         self.server = server
         self.session = SSHSession(server: server)
         super.init(nibName: nil, bundle: nil)
-        // 关键修复：绝不能调用 self.title = server.name！
-        // 因为 UIViewController.title 会级联向上篡改 UITabBarController 对应 TabBarItem 的文本！
-        // 只赋值 navigationItem.title，确保底部 Tab 始终是【状态】，永不被篡改为 DMIT 示例！
         self.navigationItem.title = server.name
         self.navigationItem.largeTitleDisplayMode = .never
     }
@@ -68,9 +65,20 @@ final class ServerDetailViewController: UIViewController {
         stackView.addArrangedSubview(diskCard)
         stackView.addArrangedSubview(infoCard)
 
-        actionsCard.setValue("已设为当前活跃主机\n可在底部【智能体/文件/容器/更多】无缝协同。")
-        stackView.addArrangedSubview(actionsCard)
-        
+        // 现代 iOS 样式的一键打开终端主操作按钮
+        openTerminalButton.translatesAutoresizingMaskIntoConstraints = false
+        openTerminalButton.setTitle(" 打开 SSH 终端会话", for: .normal)
+        let cfg = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        openTerminalButton.setImage(UIImage(systemName: "terminal.fill", withConfiguration: cfg), for: .normal)
+        openTerminalButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        openTerminalButton.backgroundColor = .systemBlue
+        openTerminalButton.tintColor = .white
+        openTerminalButton.layer.cornerRadius = 14
+        openTerminalButton.layer.cornerCurve = .continuous
+        openTerminalButton.heightAnchor.constraint(equalToConstant: 50).isActive = true
+        openTerminalButton.addTarget(self, action: #selector(didTapOpenTerminal), for: .touchUpInside)
+
+        stackView.addArrangedSubview(openTerminalButton)
 
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -84,6 +92,11 @@ final class ServerDetailViewController: UIViewController {
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: -24),
             stackView.widthAnchor.constraint(equalTo: scrollView.widthAnchor, constant: -32),
         ])
+    }
+
+    @objc private func didTapOpenTerminal() {
+        let terminalVC = HostTerminalViewController(server: server)
+        navigationController?.pushViewController(terminalVC, animated: true)
     }
 
     private func startPolling() {
