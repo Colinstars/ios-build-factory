@@ -17,7 +17,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.5.0</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleVersion</key>
@@ -26,6 +26,36 @@
     <true/>
     <key>MinimumOSVersion</key>
     <string>18.0</string>
+    
+    <!-- 关键修复：显式声明 iPhone 桌面图标资产，installd 与 SpringBoard 100% 优先读取点亮！ -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+                <string>AppIcon</string>
+            </array>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+        </dict>
+    </dict>
+    <key>CFBundleIcons~ipad</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon60x60</string>
+                <string>AppIcon76x76</string>
+                <string>AppIcon</string>
+            </array>
+            <key>CFBundleIconName</key>
+            <string>AppIcon</string>
+        </dict>
+    </dict>
+
     <key>UIDeviceFamily</key>
     <array>
         <integer>1</integer>
