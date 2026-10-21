@@ -1,6 +1,6 @@
 import UIKit
 
-// MARK: - 1. 底部【文件】全局页面 (纯 UI 稳定呈现，零网络崩溃)
+// MARK: - 1. 底部【文件】全局页面 (Termius 纯黑沉浸规范)
 
 final class GlobalFilesViewController: UIViewController {
 
@@ -8,9 +8,9 @@ final class GlobalFilesViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "文件"
+        self.navigationItem.title = "Files"
         navigationController?.navigationBar.prefersLargeTitles = true
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         addChild(filesVC)
         filesVC.view.frame = view.bounds
@@ -20,7 +20,7 @@ final class GlobalFilesViewController: UIViewController {
     }
 }
 
-// MARK: - 2. 底部【容器】全局页面 (纯 UI 稳定呈现，支持启停交互)
+// MARK: - 2. 底部【容器】全局页面 (Termius 纯黑沉浸规范)
 
 final class GlobalDockerViewController: UIViewController {
 
@@ -28,9 +28,9 @@ final class GlobalDockerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "容器"
+        self.navigationItem.title = "Containers"
         navigationController?.navigationBar.prefersLargeTitles = true
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         addChild(dockerVC)
         dockerVC.view.frame = view.bounds
@@ -40,7 +40,7 @@ final class GlobalDockerViewController: UIViewController {
     }
 }
 
-// MARK: - 3. 底部【设置】全局页面 (纯 UI 稳定呈现，导航栏上滑遮罩完美贴合)
+// MARK: - 3. 底部【设置】全局页面 (Termius 纯黑沉浸规范)
 
 final class GlobalOpsViewController: UIViewController {
 
@@ -48,9 +48,9 @@ final class GlobalOpsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "设置"
+        self.navigationItem.title = "Settings"
         navigationController?.navigationBar.prefersLargeTitles = true
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         addChild(opsVC)
         opsVC.view.frame = view.bounds

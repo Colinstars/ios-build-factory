@@ -25,7 +25,7 @@ final class FilesViewController: UIViewController {
         self.navigationItem.title = "文件"
         navigationController?.navigationBar.prefersLargeTitles = true
 
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         setupTableView()
         loadDemoFiles()
@@ -33,7 +33,7 @@ final class FilesViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(FileItemCell.self, forCellReuseIdentifier: "FileCell")

@@ -34,10 +34,10 @@ final class AgentViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "智能体"
+        self.navigationItem.title = "AI Agent"
         navigationController?.navigationBar.prefersLargeTitles = true
 
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         setupTableView()
         setupPromptChips()
@@ -71,13 +71,13 @@ final class AgentViewController: UIViewController {
             let chip = UIButton(type: .system)
             chip.setTitle(p, for: .normal)
             chip.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
-            chip.setTitleColor(.label, for: .normal)
-            chip.backgroundColor = .secondarySystemGroupedBackground
+            chip.setTitleColor(.white, for: .normal)
+            chip.backgroundColor = AppTheme.cardBackground
             chip.layer.cornerRadius = 15
             chip.layer.cornerCurve = .continuous
             chip.contentEdgeInsets = UIEdgeInsets(top: 6, left: 14, bottom: 6, right: 14)
             chip.layer.borderWidth = 0.5
-            chip.layer.borderColor = UIColor.separator.cgColor
+            chip.layer.borderColor = AppTheme.separator.cgColor
             chip.addTarget(self, action: #selector(didTapPromptChip(_:)), for: .touchUpInside)
             promptChipsStack.addArrangedSubview(chip)
         }
@@ -98,7 +98,7 @@ final class AgentViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.separatorStyle = .none
         tableView.dataSource = self
         tableView.delegate = self
@@ -111,7 +111,7 @@ final class AgentViewController: UIViewController {
 
     private func setupInputBar() {
         inputContainer.translatesAutoresizingMaskIntoConstraints = false
-        inputContainer.backgroundColor = .secondarySystemGroupedBackground
+        inputContainer.backgroundColor = AppTheme.inputBackground
         inputContainer.layer.cornerRadius = 24
         inputContainer.layer.cornerCurve = .continuous
         inputContainer.layer.borderWidth = 0.5
@@ -307,15 +307,15 @@ final class AgentBubbleCell: UITableViewCell {
         contentLabel.text = message.text
 
         if message.isUser {
-            bubbleView.backgroundColor = .systemBlue
+            bubbleView.backgroundColor = AppTheme.accent
             contentLabel.textColor = .white
             leadingConstraint?.isActive = false
             trailingConstraint?.isActive = true
         } else {
-            bubbleView.backgroundColor = .secondarySystemGroupedBackground
-            contentLabel.textColor = .label
+            bubbleView.backgroundColor = AppTheme.cardBackground
+            contentLabel.textColor = .white
             bubbleView.layer.borderWidth = 0.5
-            bubbleView.layer.borderColor = UIColor.separator.cgColor
+            bubbleView.layer.borderColor = AppTheme.separator.cgColor
             trailingConstraint?.isActive = false
             leadingConstraint?.isActive = true
         }

@@ -27,16 +27,16 @@ final class DockerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "容器"
+        self.navigationItem.title = "Containers"
         navigationController?.navigationBar.prefersLargeTitles = true
 
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
         setupTableView()
     }
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(DockerContainerCell.self, forCellReuseIdentifier: "DockerCell")

@@ -9,8 +9,8 @@ final class SSHKeysViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "SSH 密钥管理"
-        view.backgroundColor = .systemGroupedBackground
+        self.navigationItem.title = "SSH Keys"
+        view.backgroundColor = AppTheme.pageBackground
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .add,
@@ -24,7 +24,7 @@ final class SSHKeysViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "KeyCell")

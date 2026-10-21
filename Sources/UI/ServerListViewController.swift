@@ -19,11 +19,7 @@ final class ServerListViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = "Hosts"
-        view.backgroundColor = UIColor { trait in
-            trait.userInterfaceStyle == .dark
-                ? UIColor(red: 18/255.0, green: 20/255.0, blue: 30/255.0, alpha: 1.0)
-                : UIColor.systemGroupedBackground
-        }
+        view.backgroundColor = AppTheme.pageBackground
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             barButtonSystemItem: .add,

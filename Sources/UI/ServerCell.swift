@@ -22,15 +22,13 @@ final class ServerCell: UITableViewCell {
     }
 
     private func setupViews() {
-        // 卡片容器：采用 Termius 经典深蓝灰底色与 continuous 平滑大圆角
+        // 卡片容器：统一使用 AppTheme.cardBackground 严苛规范
         cardContainer.translatesAutoresizingMaskIntoConstraints = false
-        cardContainer.backgroundColor = UIColor { trait in
-            trait.userInterfaceStyle == .dark
-                ? UIColor(red: 24/255.0, green: 26/255.0, blue: 38/255.0, alpha: 1.0)
-                : UIColor.secondarySystemGroupedBackground
-        }
+        cardContainer.backgroundColor = AppTheme.cardBackground
         cardContainer.layer.cornerRadius = 16
         cardContainer.layer.cornerCurve = .continuous
+        cardContainer.layer.borderWidth = 0.5
+        cardContainer.layer.borderColor = AppTheme.separator.cgColor
         cardContainer.clipsToBounds = true
         contentView.addSubview(cardContainer)
 

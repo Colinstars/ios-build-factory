@@ -38,9 +38,9 @@ final class ServerOpsViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationItem.title = "设置"
+        self.navigationItem.title = "Settings"
         navigationController?.navigationBar.prefersLargeTitles = true
-        view.backgroundColor = .systemGroupedBackground
+        view.backgroundColor = AppTheme.pageBackground
 
         setupTableView()
     }
@@ -52,7 +52,7 @@ final class ServerOpsViewController: UIViewController {
 
     private func setupTableView() {
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.backgroundColor = .systemGroupedBackground
+        tableView.backgroundColor = AppTheme.pageBackground
         tableView.dataSource = self
         tableView.delegate = self
         view.addSubview(tableView)
