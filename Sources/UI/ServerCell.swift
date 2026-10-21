@@ -1,10 +1,11 @@
 import UIKit
 
-/// 100% 对标 Termius 官方 Hosts 列表卡片规范的精细化主机单元格
+/// 100% 对标 Termius 官方 Hosts 列表卡片规范的高级精雕主机单元格
 final class ServerCell: UITableViewCell {
 
-    private let iconContainer = UIView()
-    private let osIcon = UIImageView()
+    private let cardContainer = UIView()
+    private let iconBadge = UIView()
+    private let osIconView = UIImageView()
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let spinner = UIActivityIndicatorView(style: .medium)
@@ -21,74 +22,113 @@ final class ServerCell: UITableViewCell {
     }
 
     private func setupViews() {
-        // 卡片底座
-        contentView.backgroundColor = UIColor { trait in
+        // 卡片容器：采用 Termius 经典深蓝灰底色与 continuous 平滑大圆角
+        cardContainer.translatesAutoresizingMaskIntoConstraints = false
+        cardContainer.backgroundColor = UIColor { trait in
             trait.userInterfaceStyle == .dark
-                ? UIColor(red: 28/255.0, green: 30/255.0, blue: 44/255.0, alpha: 1.0)
+                ? UIColor(red: 24/255.0, green: 26/255.0, blue: 38/255.0, alpha: 1.0)
                 : UIColor.secondarySystemGroupedBackground
         }
-        contentView.layer.cornerRadius = 14
-        contentView.clipsToBounds = true
+        cardContainer.layer.cornerRadius = 16
+        cardContainer.layer.cornerCurve = .continuous
+        cardContainer.clipsToBounds = true
+        contentView.addSubview(cardContainer)
 
-        iconContainer.translatesAutoresizingMaskIntoConstraints = false
-        iconContainer.backgroundColor = UIColor(red: 215/255.0, green: 10/255.0, blue: 83/255.0, alpha: 0.15)
-        iconContainer.layer.cornerRadius = 10
-        iconContainer.clipsToBounds = true
-        contentView.addSubview(iconContainer)
+        // 左侧操作系统图标徽章 (对齐 Termius 的 Debian 红/粉圆角底座)
+        iconBadge.translatesAutoresizingMaskIntoConstraints = false
+        iconBadge.layer.cornerRadius = 12
+        iconBadge.layer.cornerCurve = .continuous
+        iconBadge.clipsToBounds = true
+        cardContainer.addSubview(iconBadge)
 
-        osIcon.translatesAutoresizingMaskIntoConstraints = false
-        let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
-        osIcon.image = UIImage(systemName: "terminal.fill", withConfiguration: cfg)
-        osIcon.tintColor = UIColor(red: 235/255.0, green: 60/255.0, blue: 110/255.0, alpha: 1.0)
-        osIcon.contentMode = .scaleAspectFit
-        iconContainer.addSubview(osIcon)
+        osIconView.translatesAutoresizingMaskIntoConstraints = false
+        osIconView.contentMode = .scaleAspectFit
+        iconBadge.addSubview(osIconView)
 
+        // 主标题：加粗白字
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        titleLabel.font = .systemFont(ofSize: 17, weight: .bold)
         titleLabel.textColor = .label
-        contentView.addSubview(titleLabel)
+        titleLabel.numberOfLines = 1
+        cardContainer.addSubview(titleLabel)
 
+        // 副标题：使用标准系统字体，彻底解决 Monospaced 字体导致的下沉切边/遮挡 BUG
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        subtitleLabel.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        subtitleLabel.textColor = .secondaryLabel
-        contentView.addSubview(subtitleLabel)
+        subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        subtitleLabel.textColor = UIColor(white: 0.6, alpha: 1.0)
+        subtitleLabel.numberOfLines = 1
+        cardContainer.addSubview(subtitleLabel)
 
         spinner.translatesAutoresizingMaskIntoConstraints = false
         spinner.hidesWhenStopped = true
         spinner.color = UIColor(red: 122/255.0, green: 162/255.0, blue: 247/255.0, alpha: 1.0)
-        contentView.addSubview(spinner)
+        cardContainer.addSubview(spinner)
 
         NSLayoutConstraint.activate([
-            iconContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
-            iconContainer.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            iconContainer.widthAnchor.constraint(equalToConstant: 42),
-            iconContainer.heightAnchor.constraint(equalToConstant: 42),
+            // 卡片容器在 Cell 内部留出舒适边距
+            cardContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 6),
+            cardContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            cardContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            cardContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -6),
 
-            osIcon.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
-            osIcon.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            // 图标底座：44x44
+            iconBadge.leadingAnchor.constraint(equalTo: cardContainer.leadingAnchor, constant: 14),
+            iconBadge.centerYAnchor.constraint(equalTo: cardContainer.centerYAnchor),
+            iconBadge.widthAnchor.constraint(equalToConstant: 44),
+            iconBadge.heightAnchor.constraint(equalToConstant: 44),
 
-            titleLabel.leadingAnchor.constraint(equalTo: iconContainer.trailingAnchor, constant: 14),
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
+            osIconView.centerXAnchor.constraint(equalTo: iconBadge.centerXAnchor),
+            osIconView.centerYAnchor.constraint(equalTo: iconBadge.centerYAnchor),
+            osIconView.widthAnchor.constraint(equalToConstant: 24),
+            osIconView.heightAnchor.constraint(equalToConstant: 24),
+
+            // 文本区域：高度充裕，彻底杜绝字母 g, p, y, q 或下划线被裁切
+            titleLabel.leadingAnchor.constraint(equalTo: iconBadge.trailingAnchor, constant: 14),
+            titleLabel.topAnchor.constraint(equalTo: cardContainer.topAnchor, constant: 14),
             titleLabel.trailingAnchor.constraint(equalTo: spinner.leadingAnchor, constant: -10),
 
             subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
-            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 5),
             subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
-            subtitleLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -14),
+            subtitleLabel.bottomAnchor.constraint(equalTo: cardContainer.bottomAnchor, constant: -14),
 
-            spinner.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            spinner.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+            spinner.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -18),
+            spinner.centerYAnchor.constraint(equalTo: cardContainer.centerYAnchor)
         ])
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // 留出卡片上下边距
-        contentView.frame = contentView.frame.inset(by: UIEdgeInsets(top: 4, left: 16, bottom: 4, right: 16))
     }
 
     func configure(with server: Server, isConnecting: Bool = false) {
         titleLabel.text = server.name
+
+        // 智能根据系统类型自动渲染真实 Linux 发行版官方色彩徽章 (对齐 Termius)
+        let os = (server.osType ?? "").lowercased()
+        if os.contains("debian") || server.name.lowercased().contains("dmit") || server.name.lowercased().contains("debian") {
+            // Debian 官方标志：Debian 螺旋红白徽章
+            iconBadge.backgroundColor = UIColor(red: 215/255.0, green: 10/255.0, blue: 83/255.0, alpha: 0.95)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+            osIconView.image = UIImage(systemName: "tornado", withConfiguration: cfg) // 拟物 Debian 螺旋
+            osIconView.tintColor = .white
+        } else if os.contains("ubuntu") {
+            iconBadge.backgroundColor = UIColor(red: 233/255.0, green: 84/255.0, blue: 32/255.0, alpha: 0.95)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+            osIconView.image = UIImage(systemName: "circle.circle.fill", withConfiguration: cfg)
+            osIconView.tintColor = .white
+        } else if os.contains("centos") || os.contains("redhat") {
+            iconBadge.backgroundColor = UIColor(red: 147/255.0, green: 34/255.0, blue: 147/255.0, alpha: 0.95)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+            osIconView.image = UIImage(systemName: "cube.fill", withConfiguration: cfg)
+            osIconView.tintColor = .white
+        } else if os.contains("alpine") {
+            iconBadge.backgroundColor = UIColor(red: 13/255.0, green: 89/255.0, blue: 135/255.0, alpha: 0.95)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+            osIconView.image = UIImage(systemName: "mountain.2.fill", withConfiguration: cfg)
+            osIconView.tintColor = .white
+        } else {
+            iconBadge.backgroundColor = UIColor(red: 45/255.0, green: 50/255.0, blue: 70/255.0, alpha: 0.95)
+            let cfg = UIImage.SymbolConfiguration(pointSize: 18, weight: .bold)
+            osIconView.image = UIImage(systemName: "terminal.fill", withConfiguration: cfg)
+            osIconView.tintColor = UIColor(red: 122/255.0, green: 162/255.0, blue: 247/255.0, alpha: 1.0)
+        }
 
         if isConnecting {
             subtitleLabel.text = "Connecting..."
@@ -96,7 +136,7 @@ final class ServerCell: UITableViewCell {
             spinner.startAnimating()
         } else {
             subtitleLabel.text = "\(server.username)@\(server.host):\(server.port)"
-            subtitleLabel.textColor = .secondaryLabel
+            subtitleLabel.textColor = UIColor(white: 0.55, alpha: 1.0)
             spinner.stopAnimating()
         }
     }

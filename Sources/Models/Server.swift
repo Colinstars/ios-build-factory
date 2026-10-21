@@ -8,6 +8,7 @@ struct Server: Identifiable, Codable, Hashable {
     var username: String
     var authType: AuthType
     var tag: String?            // 分组标签 (如: 生产, 测试, 香港)
+    var osType: String?         // 操作系统识别 (如: debian, ubuntu, centos, alpine, arch, linux)
 
     enum AuthType: Codable, Hashable {
         case password(String)
@@ -20,7 +21,8 @@ struct Server: Identifiable, Codable, Hashable {
          port: Int = 22,
          username: String = "root",
          authType: AuthType,
-         tag: String? = nil) {
+         tag: String? = nil,
+         osType: String? = nil) {
         self.id = id
         self.name = name
         self.host = host
@@ -28,6 +30,7 @@ struct Server: Identifiable, Codable, Hashable {
         self.username = username
         self.authType = authType
         self.tag = tag
+        self.osType = osType
     }
 }
 

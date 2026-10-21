@@ -2,14 +2,14 @@ import Foundation
 
 final class ServerStore {
     static let shared = ServerStore()
-    private let key = "serverlens.servers.v3"
+    private let key = "serverlens.servers.v4"
 
     private(set) var servers: [Server] = []
 
     private init() {
         load()
         if servers.isEmpty {
-            // 预置已绑定有效 Ed25519 私钥的真实 DMIT 主机，开箱即用 100% 瞬连！
+            // 预置已绑定有效 Ed25519 私钥与 Debian 系统标识的真实 DMIT 主机
             servers = [
                 Server(
                     name: "DMIT-LAX.PRO",
@@ -17,7 +17,8 @@ final class ServerStore {
                     port: 22,
                     username: "root",
                     authType: .sshKey(keyId: SSHKeyStore.dmitKeyId),
-                    tag: "生产 / 洛杉矶"
+                    tag: "生产 / 洛杉矶",
+                    osType: "debian"
                 )
             ]
             save()
@@ -27,6 +28,13 @@ final class ServerStore {
     func add(_ server: Server) {
         servers.append(server)
         save()
+    }
+
+    func updateOS(for id: UUID, os: String) {
+        if let idx = servers.firstIndex(where: { $0.id == id }) {
+            servers[idx].osType = os
+            save()
+        }
     }
 
     func delete(at index: Int) {
