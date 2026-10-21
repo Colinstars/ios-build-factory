@@ -18,9 +18,6 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
     private var accessoryContainer: TerminalAccessoryView!
     private var accessoryBottomConstraint: NSLayoutConstraint?
 
-    // Termius 标志性右侧边缘悬浮把手
-    private let rightEdgeHandle = UIButton(type: .system)
-
     private var session: SSHSession?
     private var ptyRelay: SSHPtyStreamRelay?
 
@@ -53,7 +50,6 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
 
         setupWebView()
         setupAccessoryBar()
-        setupRightEdgeHandle()
         setupKeyboardObservers()
         loadXterm()
         startInteractivePtySession()
@@ -102,31 +98,6 @@ final class HostTerminalViewController: UIViewController, WKScriptMessageHandler
             bottomConstraint,
 
             webView.bottomAnchor.constraint(equalTo: accessoryContainer.topAnchor)
-        ])
-    }
-
-    private func setupRightEdgeHandle() {
-        // Termius 标志性右侧边半透明把手
-        rightEdgeHandle.translatesAutoresizingMaskIntoConstraints = false
-        let cfg = UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)
-        rightEdgeHandle.setImage(UIImage(systemName: "chevron.left", withConfiguration: cfg), for: .normal)
-        rightEdgeHandle.tintColor = UIColor(white: 0.8, alpha: 0.8)
-        rightEdgeHandle.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
-        rightEdgeHandle.layer.cornerRadius = 14
-        rightEdgeHandle.layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
-        rightEdgeHandle.clipsToBounds = true
-
-        rightEdgeHandle.addAction(UIAction(handler: { [weak self] _ in
-            self?.didTapMenuAction()
-        }), for: .touchUpInside)
-
-        view.addSubview(rightEdgeHandle)
-
-        NSLayoutConstraint.activate([
-            rightEdgeHandle.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            rightEdgeHandle.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
-            rightEdgeHandle.widthAnchor.constraint(equalToConstant: 24),
-            rightEdgeHandle.heightAnchor.constraint(equalToConstant: 64)
         ])
     }
 
