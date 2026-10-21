@@ -28,8 +28,7 @@ actor SSHSession {
                     return .passwordBased(username: user, password: pwd)
                 case .sshKey(let keyId):
                     if let keyObj = SSHKeyStore.shared.keys.first(where: { $0.id == keyId }),
-                       let rawData = Data(base64Encoded: keyObj.privateKeyPEM),
-                       let privKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: rawData) {
+                       let privKey = keyObj.parseEd25519PrivateKey() {
                         return .ed25519(username: user, privateKey: privKey)
                     }
                     return .passwordBased(username: user, password: "")
