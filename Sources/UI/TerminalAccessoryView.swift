@@ -4,13 +4,13 @@ protocol TerminalAccessoryViewDelegate: AnyObject {
     func terminalAccessoryViewDidTapBack(_ view: TerminalAccessoryView)
     func terminalAccessoryViewDidTapCloseSession(_ view: TerminalAccessoryView)
     func terminalAccessoryViewDidTapNewTab(_ view: TerminalAccessoryView)
-    func terminalAccessoryViewDidTapMenu(_ view: TerminalAccessoryView)
+    func terminalAccessoryViewDidTapGridMenu(_ view: TerminalAccessoryView)
     func terminalAccessoryView(_ view: TerminalAccessoryView, didSendKey key: String)
     func terminalAccessoryViewDidTapPaste(_ view: TerminalAccessoryView)
     func terminalAccessoryViewDidTapDismissKeyboard(_ view: TerminalAccessoryView)
 }
 
-/// 终端专用输入辅助栏组件
+/// 终端专用输入辅助栏组件 (支持右侧固定独立收起键盘按钮与等宽统一按键)
 final class TerminalAccessoryView: UIView {
 
     weak var delegate: TerminalAccessoryViewDelegate?
@@ -24,8 +24,11 @@ final class TerminalAccessoryView: UIView {
     private let addTabButton = UIButton(type: .system)
     private let menuButton = UIButton(type: .system)
 
+    // 第二层：左侧横向滚动按键区 + 右侧固定独立收起键盘按钮
+    private let bottomToolbar = UIView()
     private let bottomKeyScrollView = UIScrollView()
     private let bottomKeyStack = UIStackView()
+    private let fixedDismissKeyboardButton = UIButton(type: .system)
 
     private let feedback = UISelectionFeedbackGenerator()
     private var isCtrlActive: Bool = false
@@ -123,21 +126,39 @@ final class TerminalAccessoryView: UIView {
         menuButton.addAction(UIAction(handler: { [weak self] _ in
             guard let self = self else { return }
             self.feedback.selectionChanged()
-            self.delegate?.terminalAccessoryViewDidTapMenu(self)
+            self.delegate?.terminalAccessoryViewDidTapGridMenu(self)
         }), for: .touchUpInside)
         topSessionBar.addSubview(menuButton)
 
-        // 第二层：专业物理按键工具栏
+        // 第二层：左侧滚动工具栏 + 右侧固定独立键盘收起按钮
+        bottomToolbar.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(bottomToolbar)
+
         bottomKeyScrollView.translatesAutoresizingMaskIntoConstraints = false
         bottomKeyScrollView.showsHorizontalScrollIndicator = false
         bottomKeyScrollView.showsVerticalScrollIndicator = false
-        addSubview(bottomKeyScrollView)
+        bottomToolbar.addSubview(bottomKeyScrollView)
 
         bottomKeyStack.translatesAutoresizingMaskIntoConstraints = false
         bottomKeyStack.axis = .horizontal
         bottomKeyStack.spacing = 6
         bottomKeyStack.alignment = .center
         bottomKeyScrollView.addSubview(bottomKeyStack)
+
+        // 右侧固定常驻的键盘收起按钮
+        fixedDismissKeyboardButton.translatesAutoresizingMaskIntoConstraints = false
+        let kbCfg = UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+        fixedDismissKeyboardButton.setImage(UIImage(systemName: "keyboard.chevron.compact.down", withConfiguration: kbCfg), for: .normal)
+        fixedDismissKeyboardButton.tintColor = UIColor(white: 0.85, alpha: 1.0)
+        fixedDismissKeyboardButton.backgroundColor = UIColor(white: 1.0, alpha: 0.12)
+        fixedDismissKeyboardButton.layer.cornerRadius = 6
+        fixedDismissKeyboardButton.layer.cornerCurve = .continuous
+        fixedDismissKeyboardButton.addAction(UIAction(handler: { [weak self] _ in
+            guard let self = self else { return }
+            self.feedback.selectionChanged()
+            self.delegate?.terminalAccessoryViewDidTapDismissKeyboard(self)
+        }), for: .touchUpInside)
+        bottomToolbar.addSubview(fixedDismissKeyboardButton)
 
         setupKeyButtons()
 
@@ -186,10 +207,23 @@ final class TerminalAccessoryView: UIView {
             sessionTitleLabel.trailingAnchor.constraint(equalTo: sessionCloseBtn.leadingAnchor, constant: -6),
             sessionTitleLabel.centerYAnchor.constraint(equalTo: sessionPill.centerYAnchor),
 
-            bottomKeyScrollView.topAnchor.constraint(equalTo: topSessionBar.bottomAnchor, constant: 4),
-            bottomKeyScrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
-            bottomKeyScrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
-            bottomKeyScrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5),
+            // 第二层整体容器
+            bottomToolbar.topAnchor.constraint(equalTo: topSessionBar.bottomAnchor, constant: 4),
+            bottomToolbar.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
+            bottomToolbar.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
+            bottomToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -5),
+
+            // 右侧固定收起按钮：宽度 38，高度 32，固定在最右边
+            fixedDismissKeyboardButton.trailingAnchor.constraint(equalTo: bottomToolbar.trailingAnchor),
+            fixedDismissKeyboardButton.centerYAnchor.constraint(equalTo: bottomToolbar.centerYAnchor),
+            fixedDismissKeyboardButton.widthAnchor.constraint(equalToConstant: 38),
+            fixedDismissKeyboardButton.heightAnchor.constraint(equalToConstant: 32),
+
+            // 左侧滚动区域：右侧紧贴固定按钮
+            bottomKeyScrollView.topAnchor.constraint(equalTo: bottomToolbar.topAnchor),
+            bottomKeyScrollView.leadingAnchor.constraint(equalTo: bottomToolbar.leadingAnchor),
+            bottomKeyScrollView.trailingAnchor.constraint(equalTo: fixedDismissKeyboardButton.leadingAnchor, constant: -6),
+            bottomKeyScrollView.bottomAnchor.constraint(equalTo: bottomToolbar.bottomAnchor),
 
             bottomKeyStack.topAnchor.constraint(equalTo: bottomKeyScrollView.topAnchor),
             bottomKeyStack.leadingAnchor.constraint(equalTo: bottomKeyScrollView.leadingAnchor),
@@ -200,6 +234,7 @@ final class TerminalAccessoryView: UIView {
     }
 
     private func setupKeyButtons() {
+        // 标准高频按键：统一度量衡，规整等高统一内边距
         let items: [(title: String, symbol: String?, code: String)] = [
             ("shift tab", nil, "\u{1b}[Z"),
             ("?", nil, "?"),
@@ -214,8 +249,7 @@ final class TerminalAccessoryView: UIView {
             ("↑", nil, "\u{1b}[A"),
             ("↓", nil, "\u{1b}[B"),
             ("←", nil, "\u{1b}[D"),
-            ("→", nil, "\u{1b}[C"),
-            ("", "keyboard.chevron.compact.down", "DISMISS_KEYBOARD")
+            ("→", nil, "\u{1b}[C")
         ]
 
         for item in items {
@@ -233,7 +267,8 @@ final class TerminalAccessoryView: UIView {
             btn.backgroundColor = UIColor(white: 1.0, alpha: 0.10)
             btn.layer.cornerRadius = 6
             btn.layer.cornerCurve = .continuous
-            btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+            btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+            btn.heightAnchor.constraint(equalToConstant: 32).isActive = true
 
             if item.code == "TOGGLE_CTRL" {
                 self.ctrlButton = btn
@@ -253,8 +288,6 @@ final class TerminalAccessoryView: UIView {
         switch code {
         case "PASTE_CLIPBOARD":
             delegate?.terminalAccessoryViewDidTapPaste(self)
-        case "DISMISS_KEYBOARD":
-            delegate?.terminalAccessoryViewDidTapDismissKeyboard(self)
         case "TOGGLE_CTRL":
             isCtrlActive.toggle()
             ctrlButton?.backgroundColor = isCtrlActive

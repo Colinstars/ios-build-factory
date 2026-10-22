@@ -8,12 +8,14 @@ final class HostTerminalViewController: UIViewController {
     private let server: Server
     private var terminalView: TerminalView!
     private var accessoryBar: TerminalAccessoryView!
+    private var customInputView: TerminalCustomInputView!
 
     private var session: SSHSession?
     private var ptyRelay: SSHPtyStreamRelay?
 
     private var currentCols: Int = 80
     private var currentRows: Int = 24
+    private var isUsingCustomKeyboard: Bool = false
 
     var onSessionDisconnected: ((Server, String?) -> Void)?
 
@@ -43,6 +45,7 @@ final class HostTerminalViewController: UIViewController {
         view.backgroundColor = AppTheme.pageBackground
 
         setupTerminalView()
+        setupCustomInputView()
         startInteractivePtySession()
     }
 
@@ -78,8 +81,47 @@ final class HostTerminalViewController: UIViewController {
         terminalView.addGestureRecognizer(tap)
     }
 
+    private func setupCustomInputView() {
+        customInputView = TerminalCustomInputView()
+        customInputView.onSendKey = { [weak self] code in
+            self?.ptyRelay?.writeString(code)
+        }
+        customInputView.onSwitchToSystemKeyboard = { [weak self] in
+            self?.switchToSystemKeyboard()
+        }
+        customInputView.onSelectTheme = { [weak self] themeName in
+            self?.applyTerminalTheme(themeName)
+        }
+    }
+
     @objc private func didTapTerminal() {
         terminalView.becomeFirstResponder()
+    }
+
+    private func switchToCustomKeyboard() {
+        isUsingCustomKeyboard = true
+        terminalView.inputView = customInputView
+        terminalView.reloadInputViews()
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+    }
+
+    private func switchToSystemKeyboard() {
+        isUsingCustomKeyboard = false
+        terminalView.inputView = nil
+        terminalView.reloadInputViews()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
+    private func applyTerminalTheme(_ name: String) {
+        if name.contains("Tokyo") {
+            terminalView.backgroundColor = UIColor(red: 26/255.0, green: 27/255.0, blue: 38/255.0, alpha: 1.0)
+        } else if name.contains("Kanagawa") {
+            terminalView.backgroundColor = UIColor(red: 31/255.0, green: 31/255.0, blue: 40/255.0, alpha: 1.0)
+        } else if name.contains("Dracula") {
+            terminalView.backgroundColor = UIColor(red: 40/255.0, green: 42/255.0, blue: 54/255.0, alpha: 1.0)
+        } else {
+            terminalView.backgroundColor = AppTheme.pageBackground
+        }
     }
 
     /// 启动远程 Linux PTY 会话
@@ -127,29 +169,6 @@ final class HostTerminalViewController: UIViewController {
                 }
             }
         }
-    }
-
-    private func didTapMenuAction() {
-        let sheet = TerminalActionSheetViewController()
-        sheet.modalPresentationStyle = .overFullScreen
-        sheet.modalTransitionStyle = .crossDissolve
-
-        sheet.onClear = { [weak self] in
-            self?.terminalView.feed(text: "\u{1b}[2J\u{1b}[H")
-        }
-        sheet.onRedraw = { [weak self] in
-            guard let self = self else { return }
-            self.ptyRelay?.writeString("\u{0c}")
-            self.ptyRelay?.resize(cols: self.currentCols, rows: self.currentRows)
-        }
-        sheet.onReconnect = { [weak self] in
-            self?.startInteractivePtySession()
-        }
-        sheet.onDisconnect = { [weak self] in
-            self?.navigationController?.popViewController(animated: true)
-        }
-
-        present(sheet, animated: true)
     }
 }
 
@@ -215,8 +234,13 @@ extension HostTerminalViewController: TerminalAccessoryViewDelegate {
         present(alert, animated: true)
     }
 
-    func terminalAccessoryViewDidTapMenu(_ view: TerminalAccessoryView) {
-        didTapMenuAction()
+    /// 点击四宫格：直接无缝切换为原厂多 Tab 极客扩展键盘！
+    func terminalAccessoryViewDidTapGridMenu(_ view: TerminalAccessoryView) {
+        if isUsingCustomKeyboard {
+            switchToSystemKeyboard()
+        } else {
+            switchToCustomKeyboard()
+        }
     }
 
     func terminalAccessoryView(_ view: TerminalAccessoryView, didSendKey key: String) {
